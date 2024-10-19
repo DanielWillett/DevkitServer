@@ -63,10 +63,9 @@ internal static class UserCryptographyStore
     /// <remarks>Thread-safe</remarks>
     internal static bool TryGetUser(ITransportConnection connection, [MaybeNullWhen(false)] out byte[] publicKey)
     {
-        CSteamID? s64 = UserManager.TryGetSteamId(connection);
-        if (s64.HasValue)
+        if (connection.TryGetSteamId(out ulong s64) && new CSteamID(s64).GetEAccountType() == EAccountType.k_EAccountTypeIndividual)
         {
-            if (RsaKeysSteam64.TryGetValue(s64.Value.m_SteamID, out publicKey))
+            if (RsaKeysSteam64.TryGetValue(s64, out publicKey))
                 return true;
         }
 
@@ -94,10 +93,9 @@ internal static class UserCryptographyStore
             RsaKeysIPv4.TryRemove(ipv4, out _);
         }
 
-        CSteamID? s64 = UserManager.TryGetSteamId(connection);
-        if (s64.HasValue)
+        if (connection.TryGetSteamId(out ulong s64) && new CSteamID(s64).GetEAccountType() == EAccountType.k_EAccountTypeIndividual)
         {
-            RsaKeysSteam64.TryRemove(s64.Value.m_SteamID, out _);
+            RsaKeysSteam64.TryRemove(s64, out _);
         }
     }
 #else

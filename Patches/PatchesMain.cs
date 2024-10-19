@@ -869,7 +869,8 @@ internal static class PatchesMain
 
         if (!connection.TryGetIPv4Address(out uint address))
         {
-            steam64 = UserManager.TryGetSteamId(connection);
+            if (connection.TryGetSteamId(out ulong s64))
+                steam64 = new CSteamID(s64);
             if (!steam64.UserSteam64())
             {
                 Logger.DevkitServer.LogInfo(nameof(ReadPasswordHash), " Failed to get IPv4 and Steam ID of connecting user.");
@@ -886,7 +887,8 @@ internal static class PatchesMain
         {
             ipv4 = new IPv4Address(address);
 
-            steam64 = UserManager.TryGetSteamId(connection);
+            if (connection.TryGetSteamId(out ulong s64))
+                steam64 = new CSteamID(s64);
             if (!steam64.UserSteam64())
             {
                 steam64 = CSteamID.Nil;

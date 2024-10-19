@@ -172,7 +172,9 @@ public static class CartographyReplication
 #if SERVER
             PermissionLeaf leaf = isChart ? VanillaPermissions.BakeCartographyChart : VanillaPermissions.BakeCartographyGPS;
 
-            CSteamID steamId = UserManager.TryGetSteamId(Transmission.Connections[0]);
+            CSteamID steamId = CSteamID.Nil;
+            if (Transmission.Connections[0].TryGetSteamId(out ulong s64))
+                steamId = new CSteamID(s64);
 
             if (steamId.UserSteam64() && leaf.Has(steamId.m_SteamID))
                 return;

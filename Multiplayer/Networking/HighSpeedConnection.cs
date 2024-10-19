@@ -120,6 +120,13 @@ public class HighSpeedConnection : ITransportConnection
         port = 0;
         return false;
     }
+
+    public bool TryGetSteamId(out ulong steamId)
+    {
+        steamId = Steam64;
+        return true;
+    }
+
     public IPAddress GetAddress() => (Client.Client.RemoteEndPoint as IPEndPoint)?.Address ?? IPAddress.None;
     public string GetAddressString(bool withPort)
     {

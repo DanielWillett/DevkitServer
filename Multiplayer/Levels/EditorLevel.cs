@@ -38,7 +38,9 @@ public static class EditorLevel
             return StandardErrorCode.AccessViolation;
         }
 
-        CSteamID user = UserManager.TryGetSteamId(ctx.Connection);
+        CSteamID user = CSteamID.Nil;
+        if (ctx.Connection.TryGetSteamId(out ulong s64))
+            user = new CSteamID(s64);
         if (user.GetEAccountType() == EAccountType.k_EAccountTypeIndividual)
         {
             if (user != fallbackUser)

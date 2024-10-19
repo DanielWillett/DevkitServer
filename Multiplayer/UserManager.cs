@@ -76,7 +76,11 @@ public static class UserManager
     {
         if (connection == null) return null;
 
-        CSteamID steamId = TryGetSteamId(connection);
+        CSteamID steamId = CSteamID.Nil;
+
+        if (connection.TryGetSteamId(out ulong steamId64))
+            steamId = new CSteamID(steamId64);
+
         if (steamId.UserSteam64())
         {
             EditorUser? user = FromId(steamId.m_SteamID);
@@ -314,123 +318,6 @@ public static class UserManager
         int SortNickName(SteamPlayer a, SteamPlayer b) => a.playerID.nickName.Length.CompareTo(b.playerID.nickName.Length);
         int SortCharacterName(SteamPlayer a, SteamPlayer b) => a.playerID.characterName.Length.CompareTo(b.playerID.characterName.Length);
     }
-#if SERVER
-    private static Func<ITransportConnection, CSteamID>? _getSteamIdFunction;
-    private static bool _hasGeneratedSteamIdFunction;
-
-    /// <summary>
-    /// Tries to get the Steam64 ID of a transport connection first from it's implementation (SteamNetworkingSockets, etc) then just with <see cref="Provider.findTransportConnectionSteamId"/>.
-    /// </summary>
-    /// <returns>The <see cref="CSteamID"/> of the user behind the connection, or just <see cref="CSteamID.Nil"/>.</returns>
-    /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static CSteamID TryGetSteamId(ITransportConnection connection)
-    {
-        if (connection is HighSpeedConnection hs)
-            return new CSteamID(hs.Steam64);
-
-        ThreadUtil.assertIsGameThread();
-
-        if (!_hasGeneratedSteamIdFunction)
-        {
-            _hasGeneratedSteamIdFunction = true;
-            try
-            {
-                GenerateTransportConnectionSteamIdMethod();
-            }
-            catch (Exception ex)
-            {
-                Logger.DevkitServer.LogError(nameof(TryGetSteamId), ex, "Failed to create ITransportConnection to CSteamID converter method.");
-            }
-        }
-        
-        if (_getSteamIdFunction != null)
-        {
-            CSteamID id = _getSteamIdFunction(connection);
-            if (id.m_SteamID != 0)
-                return id;
-        }
-
-        return Provider.findTransportConnectionSteamId(connection);
-    }
-    private static void GenerateTransportConnectionSteamIdMethod()
-    {
-        Accessor.GetDynamicMethodFlags(true, out MethodAttributes attr, out CallingConventions convention);
-
-        DynamicMethod method = new DynamicMethod("TryGetSteamIdIntl", attr, convention, typeof(CSteamID),
-            [ typeof(ITransportConnection) ], typeof(UserManager), true);
-        method.DefineParameter(1, ParameterAttributes.None, "transportConnection");
-
-        IOpCodeEmitter emitter = method.AsEmitter(false);
-
-        Type? loopback = AccessorExtensions.AssemblyCSharp.GetType("SDG.NetTransport.Loopback.TransportConnection_Loopback");
-        Type? steamNetworking = AccessorExtensions.AssemblyCSharp.GetType("SDG.NetTransport.SteamNetworking.TransportConnection_SteamNetworking");
-        Type? steamSockets = AccessorExtensions.AssemblyCSharp.GetType("SDG.NetTransport.SteamNetworkingSockets.TransportConnection_SteamNetworkingSockets");
-
-        MethodInfo? getClientSteamId = loopback == null ? null : typeof(Provider).GetProperty(nameof(Provider.client),
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, null, typeof(CSteamID), Type.EmptyTypes,
-            null)?.GetGetMethod(true);
-
-        FieldInfo? steamNetworkingSteamId = steamNetworking?.GetField("steamId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-        FieldInfo? steamSocketsIdentity = steamSockets?.GetField("steamIdentity", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-        MethodInfo? getIdentityId = steamSocketsIdentity == null
-            ? null : typeof(SteamNetworkingIdentity).GetMethod(nameof(SteamNetworkingIdentity.GetSteamID),
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, CallingConventions.Any, Type.EmptyTypes, null);
-
-        emitter.Emit(OpCodes.Ldarg_0);
-
-        Label? lblNext = null;
-        if (steamSockets != null && steamSocketsIdentity != null && getIdentityId != null)
-        {
-            lblNext = emitter.DefineLabel();
-            emitter.Emit(OpCodes.Dup);
-            emitter.Emit(OpCodes.Isinst, steamSockets);
-            emitter.Emit(OpCodes.Brfalse_S, lblNext.Value);
-            emitter.Emit(OpCodes.Ldflda, steamSocketsIdentity);
-            emitter.Emit(OpCodes.Call, getIdentityId);
-            emitter.Emit(OpCodes.Ret);
-        }
-
-        emitter.TryMarkLabel(lblNext);
-
-        lblNext = null;
-        if (loopback != null && getClientSteamId != null)
-        {
-            lblNext = emitter.DefineLabel();
-            emitter.Emit(OpCodes.Dup);
-            emitter.Emit(OpCodes.Isinst, loopback);
-            emitter.Emit(OpCodes.Brfalse_S, lblNext.Value);
-            emitter.Emit(OpCodes.Pop);
-            emitter.Emit(OpCodes.Call, getClientSteamId);
-            emitter.Emit(OpCodes.Ret);
-        }
-
-        emitter.TryMarkLabel(lblNext);
-
-        lblNext = null;
-        if (steamNetworking != null && steamNetworkingSteamId != null)
-        {
-            lblNext = emitter.DefineLabel();
-            emitter.Emit(OpCodes.Dup);
-            emitter.Emit(OpCodes.Isinst, steamNetworking);
-            emitter.Emit(OpCodes.Brfalse_S, lblNext.Value);
-            emitter.Emit(OpCodes.Unbox, steamNetworking);
-            emitter.Emit(OpCodes.Ldflda, steamNetworkingSteamId);
-            emitter.Emit(OpCodes.Ldobj, typeof(CSteamID));
-            emitter.Emit(OpCodes.Ret);
-        }
-
-        emitter.TryMarkLabel(lblNext);
-        emitter.DeclareLocal(typeof(CSteamID));
-
-        emitter.Emit(OpCodes.Pop);
-        emitter.Emit(OpCodes.Ldloca_S, 0);
-        emitter.Emit(OpCodes.Initobj, typeof(CSteamID));
-        emitter.Emit(OpCodes.Ldloc_0);
-        emitter.Emit(OpCodes.Ret);
-
-        _getSteamIdFunction = (Func<ITransportConnection, CSteamID>)method.CreateDelegate(typeof(Func<ITransportConnection, CSteamID>));
-    }
-#endif
 }
 public enum NameSearchType : byte
 {

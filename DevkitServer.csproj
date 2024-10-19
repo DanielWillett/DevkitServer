@@ -18,7 +18,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <DisableImplicitFrameworkReferences>false</DisableImplicitFrameworkReferences>
-    <Version>0.0.34</Version>
+    <Version>0.0.35</Version>
     <Authors>DanielWillett</Authors>
     <Company>DanielWillett</Company>
     <Description>Module for Unturned that enables multi-user map editing.</Description>
@@ -111,5 +111,6 @@
 
   <ItemGroup>
     <Folder Include="Module\Bin\" />
+    <Folder Include="Multiplayer\HighSpeed\" />
   </ItemGroup>
 </Project>

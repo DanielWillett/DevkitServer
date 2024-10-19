@@ -1085,7 +1085,7 @@ public static class FormattingUtil
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
                 return connection.GetAddressString(true);
 #if SERVER
-            CSteamID steamId = DevkitServerModule.IsMainThread ? UserManager.TryGetSteamId(connection) : CSteamID.Nil;
+            CSteamID steamId = DevkitServerModule.IsMainThread && connection.TryGetSteamId(out ulong s64Id) ? new CSteamID(s64Id) : CSteamID.Nil;
 #endif
             if (connection.TryGetIPv4Address(out uint addr))
             {

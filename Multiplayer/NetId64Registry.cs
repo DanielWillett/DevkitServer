@@ -11,6 +11,7 @@ public static class NetId64Registry
             Reset();
         return new NetId64(++_min);
     }
+
     public static void Reset()
     {
         _min = 0;
