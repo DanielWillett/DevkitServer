@@ -1,3 +1,4 @@
+#if CLIENT
 using System.Diagnostics;
 using Cysharp.Threading.Tasks;
 using DevkitServer.API.Cartography;
@@ -62,3 +63,4 @@ public class SleekCompositorPipeline : SleekWrapper
         });
     }
 }
+#endif

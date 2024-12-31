@@ -1,7 +1,6 @@
 using Cysharp.Threading.Tasks;
 using DanielWillett.ReflectionTools;
 using DevkitServer.API.Cartography.ChartColorProviders;
-using DevkitServer.API.Cartography.Compositors;
 using DevkitServer.Configuration;
 using DevkitServer.Core.Cartography;
 using DevkitServer.Core.Cartography.ChartColorProviders;
@@ -13,6 +12,9 @@ using System.Text.Json;
 using Unity.Collections;
 using Unity.Jobs;
 using TransformCacheEntry = (UnityEngine.Transform transform, int layer);
+#if CLIENT
+using DevkitServer.API.Cartography.Compositors;
+#endif
 
 namespace DevkitServer.API.Cartography;
 
@@ -59,9 +61,11 @@ public static class ChartCartography
             {
                 colorProviderName = colorProviderElement.GetString();
             }
+#if CLIENT
             configData = configurationSource.Path != null ? CompositorPipeline.FromFile(configurationSource.Path) : null;
             if (configData != null && !string.IsNullOrWhiteSpace(configData.PreferredChartColorProvider))
                 colorProviderName = configData.PreferredChartColorProvider;
+#endif
         }
 
         await UniTask.SwitchToMainThread(token);

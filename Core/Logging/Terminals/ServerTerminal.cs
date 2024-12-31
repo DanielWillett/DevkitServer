@@ -1,4 +1,4 @@
-﻿#if SERVER
+#if SERVER
 using DanielWillett.ReflectionTools;
 using DevkitServer.Core.Commands.Subsystem;
 using System.Collections.Concurrent;
@@ -28,7 +28,7 @@ internal class ServerTerminal : MonoBehaviour, ITerminal
     }
     public void Write(ReadOnlySpan<char> input, ConsoleColor? color, bool saveToUnturnedLog, Severity severity)
     {
-        string msg = color.HasValue ? FormattingUtil.WrapMessageWithColor(color.Value, input) : input.ToString();
+        string msg = color.HasValue ? FormattingUtil.WrapMessageWithTerminalColorSequence(color.Value, input) : input.ToString();
 
         _msgQueue.Enqueue(new LogMessage(msg, color, saveToUnturnedLog, severity));
 

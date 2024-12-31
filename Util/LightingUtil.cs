@@ -16,6 +16,7 @@ public static class LightingUtil
     private static readonly StaticGetter<ELightingTime>? GetLightingTime = Accessor.GenerateStaticGetter<EditorEnvironmentLightingUI, ELightingTime>("selectedTime");
     private static readonly StaticSetter<ELightingTime>? SetLightingTime = Accessor.GenerateStaticSetter<EditorEnvironmentLightingUI, ELightingTime>("selectedTime");
     private static readonly Action? CallUpdateLightingTime = Accessor.GenerateStaticCaller<EditorEnvironmentLightingUI, Action>("updateSelection");
+#endif
 
     /// <summary>
     /// Parse a time string in the form <c>HH[:MM[:SS]] [AM|PM]</c> and convert it to in-game time assignable to <see cref="LevelLighting.time"/>.
@@ -163,6 +164,7 @@ public static class LightingUtil
         return true;
     }
 
+#if CLIENT
     /// <summary>
     /// The selected time in the <see cref="EditorEnvironmentLightingUI"/>.
     /// </summary>

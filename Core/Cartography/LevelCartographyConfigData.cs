@@ -42,8 +42,10 @@ public class LevelCartographyConfigData : SchemaConfiguration
 
     public CartographyCompositorConfigurationInfo[]? GetActiveCompositors()
     {
+#if CLIENT
         if (this is CompositorPipeline pipeline)
             return pipeline.Compositors;
+#endif
 
         if (_doc == null)
         {

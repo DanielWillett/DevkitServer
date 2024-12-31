@@ -638,8 +638,10 @@ public sealed class DevkitServerModule : IModuleNexus
     }
     private static async UniTask OnLevelStartLoading(LevelInfo level, CancellationToken token)
     {
+#if CLIENT
         if (Level.isEditor)
             CompositorPipelineDatabase.OnLevelStarted();
+#endif
         if (!HasLoadedBundle)
         {
             await TryLoadBundle(null).ToUniTask(ComponentHost);
