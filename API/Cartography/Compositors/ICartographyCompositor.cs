@@ -23,6 +23,7 @@ public interface ICartographyCompositor
     /// Apply any compositing to a <see cref="RenderTexture"/>. The render texture is not created until it's first used.
     /// </summary>
     /// <param name="isExplicitlyDefined">If this compositor was explicitly requested by config.</param>
+    /// <param name="configuration">Optionally supplied config. Check that <see cref="JsonElement.ValueKind"/> is not <see cref="JsonValueKind.Undefined"/>.</param>
     /// <returns><see langword="true"/> if any changes were made, otherwise <see langword="false"/>.</returns>
     bool Composite(in CartographyCaptureData data, Lazy<RenderTexture> texture, bool isExplicitlyDefined, JsonElement configuration);
 }

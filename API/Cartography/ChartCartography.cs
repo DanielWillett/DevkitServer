@@ -47,9 +47,10 @@ public static class ChartCartography
     {
         string? colorProviderName = null;
         LevelCartographyConfigData? configData = null;
+        JsonDocument? configDocument = null;
         if (configurationSource.Configuraiton.ValueKind == JsonValueKind.Undefined && configurationSource.Path == null)
         {
-            configData = LevelCartographyConfigData.ReadFromLevel(level, out JsonDocument configDocument);
+            configData = LevelCartographyConfigData.ReadFromLevel(level, out configDocument);
             colorProviderName = configData?.PreferredChartColorProvider;
             configurationSource = new CartographyConfigurationSource(configData?.FilePath, configDocument.RootElement);
         }
@@ -62,7 +63,9 @@ public static class ChartCartography
                 colorProviderName = colorProviderElement.GetString();
             }
 #if CLIENT
-            configData = configurationSource.Path != null ? CompositorPipeline.FromFile(configurationSource.Path) : null;
+            configData = configurationSource.Path != null ? CompositorPipeline.FromFile(configurationSource.Path, out configDocument) : null;
+            if (configData == null)
+                configDocument?.Dispose();
             if (configData != null && !string.IsNullOrWhiteSpace(configData.PreferredChartColorProvider))
                 colorProviderName = configData.PreferredChartColorProvider;
 #endif
@@ -92,7 +95,7 @@ public static class ChartCartography
         Texture2D? texture;
         try
         {
-            texture = CaptureChartSync(level, colorProviderName, configData, outputFile, configurationSource);
+            texture = CaptureChartSync(level, colorProviderName, configData, configDocument, outputFile, configurationSource);
         }
         catch (Exception ex)
         {
@@ -118,14 +121,29 @@ public static class ChartCartography
         return outputFile;
     }
 
-    private static unsafe Texture2D? CaptureChartSync(LevelInfo level, string? colorProviderName, LevelCartographyConfigData? configData, string outputFile, [InstantHandle] CartographyConfigurationSource configurationSource)
+    private static unsafe Texture2D? CaptureChartSync(LevelInfo level, string? colorProviderName, LevelCartographyConfigData? configData, JsonDocument? configDocument, string outputFile, [InstantHandle] CartographyConfigurationSource configurationSource)
     {
         // must be ran at the end of frame
 #if CLIENT
         _lastCartoKeepalive = 0;
 #endif
 
-        Vector2Int imgSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds);
+        Vector2Int imgSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds, configData);
+
+        Vector2Int captureSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out _);
+
+        int cx = 0, cy = 0, cw = captureSize.x, ch = captureSize.y;
+        if (captureSize.x > imgSize.x)
+            cw = imgSize.x;
+        else
+            cx = (imgSize.x - captureSize.x) / 2;
+
+        if (captureSize.y > imgSize.y)
+            ch = imgSize.y;
+        else
+            cy = (imgSize.y - captureSize.y) / 2;
+
+        RectInt captureRect = new RectInt(cx, cy, cw, ch);
 
         if (wasSizeOutOfBounds)
         {
@@ -136,17 +154,17 @@ public static class ChartCartography
 
         Bounds captureBounds = CartographyTool.CaptureBounds;
 
-        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, CartographyType.Chart, configurationSource.Path);
+        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, CartographyType.Chart, configurationSource.Path, captureRect);
 
         byte[] outputRGB24Image = new byte[imgSize.x * imgSize.y * 3];
 
-        IChartColorProvider? colorProvider = GetChartColorProvider(in data, colorProviderName, out ChartColorProviderInfo providerInfo);
+        IChartColorProvider? colorProvider = GetChartColorProvider(in data, colorProviderName, configDocument, out ChartColorProviderInfo providerInfo);
 
         if (colorProvider == null)
         {
             Logger.DevkitServer.LogWarning(nameof(ChartCartography), $"No available color providers. See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography/Charts.md", false).Format(false)} for how to set up a chart color provider. Defaulting to Washington vanilla.");
             colorProvider = new FallbackChartColorProvider();
-            colorProvider.TryInitialize(in data, true);
+            colorProvider.TryInitialize(in data, default, true);
         }
 
         object? captureState = CartographyTool.SavePreCaptureState();
@@ -166,12 +184,15 @@ public static class ChartCartography
                     case RaycastChartColorProvider simpleColorProvider:
                         CaptureBackgroundUsingJobs(simpleColorProvider, configData, ptr, in data, providerInfo, sw);
                         break;
+
                     case ISamplingChartColorProvider sampleColorProvider:
                         CaptureBackground(sampleColorProvider, configData, ptr, in data, providerInfo, sw);
                         break;
+
                     case IFullChartColorProvider fullColorProvider:
                         fullColorProvider.CaptureChart(in data, configData, ptr, sw);
                         break;
+
                     default:
                         if (providerInfo.Plugin != null)
                         {
@@ -248,7 +269,8 @@ public static class ChartCartography
     }
     private static unsafe void CaptureBackgroundUsingJobs(RaycastChartColorProvider colorProvider, LevelCartographyConfigData? config, byte* outputRgb24Image, in CartographyCaptureData data, ChartColorProviderInfo providerInfo, Stopwatch jobStopwatch)
     {
-        int imageSizeX = data.ImageSize.x, imageSizeY = data.ImageSize.y;
+        int imageSizeX = data.ImageCaptureArea.width, imageSizeY = data.ImageCaptureArea.height;
+        int imageStartX = data.ImageCaptureArea.x, imageStartY = data.ImageCaptureArea.y;
 
         int maxChunkSize = DevkitServerConfig.Config?.MaxChartRenderChunkSize ?? 4096;
         if (maxChunkSize <= 0)
@@ -260,13 +282,13 @@ public static class ChartCartography
             int chunkSizeX = imageSizeX / 2 < maxChunkSize ? (imageSizeX - 1) / 2 + 1 : maxChunkSize;
             int chunkSizeY = imageSizeY / 2 < maxChunkSize ? (imageSizeY - 1) / 2 + 1 : maxChunkSize;
             Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Chunks: {chunkSizeX.Format()}x{chunkSizeY.Format()}.");
-            int x = 0;
+            int x = data.ImageCaptureArea.x;
             do
             {
-                int y = 0;
+                int y = data.ImageCaptureArea.y;
                 do
                 {
-                    CartographyChunkData chunk = new CartographyChunkData(x, y, Math.Min(x + chunkSizeX, imageSizeX) - 1, Math.Min(y + chunkSizeY, imageSizeY) - 1);
+                    CartographyChunkData chunk = new CartographyChunkData(x + imageStartX, y + imageStartY, Math.Min(x + chunkSizeX, imageSizeX) - 1 + imageStartX, Math.Min(y + chunkSizeY, imageSizeY) - 1 + imageStartY);
                     Logger.DevkitServer.LogDebug(nameof(ChartCartography), $" Chunk: ({chunk.StartX.Format()} to {chunk.EndX.Format()}, {chunk.StartY.Format()} to {chunk.EndY.Format()}).");
 
                     if (!CaptureBackgroundUsingJobsChunk(colorProvider, config, outputRgb24Image, in data, in chunk, providerInfo, jobStopwatch))
@@ -281,7 +303,7 @@ public static class ChartCartography
             return;
         }
 
-        CartographyChunkData fullChunk = new CartographyChunkData(0, 0, imageSizeX - 1, imageSizeY - 1);
+        CartographyChunkData fullChunk = new CartographyChunkData(imageStartX, imageStartY, imageSizeX - 1 + imageStartX, imageSizeY - 1 + imageStartY);
         CaptureBackgroundUsingJobsChunk(colorProvider, config, outputRgb24Image, in data, in fullChunk, providerInfo, jobStopwatch);
     }
     private static unsafe bool CaptureBackgroundUsingJobsChunk(RaycastChartColorProvider colorProvider, LevelCartographyConfigData? config, byte* outputRgb24Image, in CartographyCaptureData data, in CartographyChunkData chunk, ChartColorProviderInfo providerInfo, [UsedImplicitly] Stopwatch jobStopwatch)
@@ -313,8 +335,8 @@ public static class ChartCartography
             {
                 for (int imgY = chunk.StartY; imgY <= chunk.EndY; ++imgY)
                 {
-                    v2.x = imgX;
-                    v2.y = imgY;
+                    v2.x = imgX - data.ImageCaptureArea.x;
+                    v2.y = imgY - data.ImageCaptureArea.y;
                     Vector3 worldCoordinates = CartographyTool.MapCoordsToWorldCoords(v2);
 
                     float x = worldCoordinates.x;
@@ -525,7 +547,7 @@ public static class ChartCartography
 
     private static unsafe void CaptureBackground(ISamplingChartColorProvider colorProvider, LevelCartographyConfigData? config, byte* outputRgb24Image, in CartographyCaptureData data, ChartColorProviderInfo providerInfo, [UsedImplicitly] Stopwatch jobStopwatch)
     {
-        int imageSizeX = data.ImageSize.x, imageSizeY = data.ImageSize.y;
+        int imageSizeX = data.ImageCaptureArea.xMax, imageSizeY = data.ImageCaptureArea.yMax;
 
         const int rgb24Size = 3;
 
@@ -537,9 +559,9 @@ public static class ChartCartography
 
         try
         {
-            for (int x = 0; x < imageSizeX; ++x)
+            for (int x = data.ImageCaptureArea.x; x < imageSizeX; ++x)
             {
-                for (int y = 0; y < imageSizeY; ++y)
+                for (int y = data.ImageCaptureArea.y; y < imageSizeY; ++y)
                 {
                     v2.x = x;
                     v2.y = y;
@@ -583,8 +605,31 @@ public static class ChartCartography
     }
 
 
-    private static IChartColorProvider? GetChartColorProvider(in CartographyCaptureData data, string? chartColorProvider, out ChartColorProviderInfo providerInfo)
+    private static IChartColorProvider? GetChartColorProvider(in CartographyCaptureData data, string? chartColorProvider, JsonDocument? document, out ChartColorProviderInfo providerInfo)
     {
+        JsonElement config = default;
+        if (document != null && string.IsNullOrWhiteSpace(chartColorProvider))
+        {
+            JsonElement root = document.RootElement;
+            if ((root.TryGetProperty("override_chart_color_provider", out JsonElement chartColor) || root.TryGetProperty("chart_color_provider", out chartColor)) && chartColor.ValueKind == JsonValueKind.Object)
+            {
+                if (chartColor.TryGetProperty("type", out JsonElement typeElement) && typeElement.ValueKind == JsonValueKind.String)
+                {
+                    chartColorProvider = typeElement.GetString();
+                    config = chartColor;
+                }
+                else
+                {
+                    Logger.DevkitServer.LogWarning(nameof(ChartCartography), "Chart provider missing 'type' property.");
+                }
+            }
+            else
+            {
+                chartColorProvider = null;
+            }
+
+        }
+
         if (!string.IsNullOrWhiteSpace(chartColorProvider))
         {
             string colorProvider = chartColorProvider;
@@ -614,7 +659,7 @@ public static class ChartCartography
 
                     try
                     {
-                        if (!provider.TryInitialize(in data, true))
+                        if (!provider.TryInitialize(in data, config, true))
                         {
                             Dispose(provider, info);
                             Logger.DevkitServer.LogError(nameof(ChartCartography), "Requested chart provider did not initialize correctly. Check logs above for more details.");
@@ -674,7 +719,7 @@ public static class ChartCartography
 
                 try
                 {
-                    if (!provider.TryInitialize(in data, false))
+                    if (!provider.TryInitialize(in data, config, false))
                     {
                         Dispose(provider, info);
                         continue;

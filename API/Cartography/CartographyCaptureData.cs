@@ -26,6 +26,11 @@ public readonly ref struct CartographyCaptureData
     public readonly Vector2Int ImageSize;
 
     /// <summary>
+    /// Area of the image that is captured to.
+    /// </summary>
+    public readonly RectInt ImageCaptureArea;
+
+    /// <summary>
     /// World coordinates, size of the bounds to capture.
     /// </summary>
     public readonly Vector3 CaptureSize;
@@ -55,7 +60,7 @@ public readonly ref struct CartographyCaptureData
     /// </summary>
     public readonly CartographyType Type;
 
-    internal CartographyCaptureData(LevelInfo level, string outputPath, Vector2Int imageSize, Vector3 captureSize, Vector3 captureCenter, float seaLevel, CartographyType type, string? configurationFilePath)
+    internal CartographyCaptureData(LevelInfo level, string outputPath, Vector2Int imageSize, Vector3 captureSize, Vector3 captureCenter, float seaLevel, CartographyType type, string? configurationFilePath, RectInt imageCaptureArea)
     {
         Level = level;
         OutputPath = outputPath;
@@ -66,6 +71,7 @@ public readonly ref struct CartographyCaptureData
         MinHeight = captureCenter.y - captureSize.y / 2f;
         Type = type;
         ConfigurationFilePath = configurationFilePath;
+        ImageCaptureArea = imageCaptureArea;
         SeaLevel = seaLevel;
     }
 }

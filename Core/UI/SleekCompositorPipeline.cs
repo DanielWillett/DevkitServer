@@ -1,8 +1,9 @@
 #if CLIENT
-using System.Diagnostics;
 using Cysharp.Threading.Tasks;
 using DevkitServer.API.Cartography;
 using DevkitServer.API.Cartography.Compositors;
+using System.Diagnostics;
+using System.Text.Json;
 
 namespace DevkitServer.Core.UI;
 
@@ -44,14 +45,18 @@ public class SleekCompositorPipeline : SleekWrapper
 
     private void OnClicked(ISleekElement button)
     {
-        CompositorPipeline? pipeline = CompositorPipeline.FromFile(FileName);
+        CompositorPipeline? pipeline = CompositorPipeline.FromFile(FileName, out JsonDocument doc);
 
         if (pipeline == null)
+        {
+            doc.Dispose();
             return;
+        }
 
         UniTask.Create(async () =>
         {
             string? path = await pipeline.Composite();
+            pipeline.Dispose();
             if (path == null || !pipeline.AutoOpen)
                 return;
 

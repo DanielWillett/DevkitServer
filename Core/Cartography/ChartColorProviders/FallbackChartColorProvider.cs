@@ -1,6 +1,7 @@
-﻿using DevkitServer.API.Cartography;
+using DevkitServer.API.Cartography;
 using DevkitServer.API.Cartography.ChartColorProviders;
 using SDG.Framework.Landscapes;
+using System.Text.Json;
 
 namespace DevkitServer.Core.Cartography.ChartColorProviders;
 
@@ -39,7 +40,7 @@ internal class FallbackChartColorProvider : RaycastChartColorProvider
         protected set => _layerPixels = value;
     }
 
-    public override bool TryInitialize(in CartographyCaptureData data, bool isExplicitlyDefined)
+    public override bool TryInitialize(in CartographyCaptureData data, JsonElement configuration, bool isExplicitlyDefined)
     {
         _heightPixels = new Color32[32];
         _layerPixels = new Color32[32];
@@ -66,7 +67,7 @@ internal class FallbackChartColorProvider : RaycastChartColorProvider
         _layerPixels.AsSpan(5, 9).Fill(new Color32(255, 0, 255, 255));
         _layerPixels.AsSpan(17, 15).Fill(new Color32(255, 0, 255, 255));
 
-        return base.TryInitialize(in data, isExplicitlyDefined);
+        return base.TryInitialize(in data, configuration, isExplicitlyDefined);
     }
 
     /// <inheritdoc />

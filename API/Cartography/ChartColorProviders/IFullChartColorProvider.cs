@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using DevkitServer.Core.Cartography;
 
 namespace DevkitServer.API.Cartography.ChartColorProviders;

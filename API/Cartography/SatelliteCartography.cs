@@ -37,7 +37,10 @@ public static class SatelliteCartography
         }
         else if (configurationSource.Path != null)
         {
-            configData = configurationSource.Path != null ? CompositorPipeline.FromFile(configurationSource.Path) : null;
+            JsonDocument? doc = null;
+            configData = configurationSource.Path != null ? CompositorPipeline.FromFile(configurationSource.Path, out doc) : null;
+            if (configData == null)
+                doc?.Dispose();
         }
 
         await UniTask.SwitchToMainThread(token);
@@ -89,7 +92,36 @@ public static class SatelliteCartography
     {
         // should be ran at end of frame
 
-        Vector2Int imgSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out Vector2Int superSampleSize, out bool wasSizeOutOfBounds, out bool wasSuperSampleOutOfBounds);
+        Vector2Int imgSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out Vector2Int superSampleSize, out bool wasSizeOutOfBounds, out bool wasSuperSampleOutOfBounds, configData);
+
+        Vector2Int captureSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out _, out _, out _);
+
+        int cx = 0, cy = 0, cw = captureSize.x, ch = captureSize.y;
+        if (captureSize.x > imgSize.x)
+            cw = imgSize.x;
+        else
+            cx = (imgSize.x - captureSize.x) / 2;
+
+        if (captureSize.y > imgSize.y)
+            ch = imgSize.y;
+        else
+            cy = (imgSize.y - captureSize.y) / 2;
+
+        RectInt captureRect = new RectInt(cx, cy, cw, ch);
+
+        cx = 0; cy = 0; cw = captureSize.x; ch = captureSize.y;
+        if (captureSize.x > superSampleSize.x)
+            cw = superSampleSize.x;
+        else
+            cx = (superSampleSize.x - captureSize.x) / 2;
+
+        if (captureSize.y > superSampleSize.y)
+            ch = superSampleSize.y;
+        else
+            cy = (superSampleSize.y - captureSize.y) / 2;
+        RectInt superSampleRect = new RectInt(cx, cy, cw, ch);
+
+        Logger.DevkitServer.LogConditional(nameof(SatelliteCartography), $"Capture rect: {captureRect.Format()}, imgSize: {imgSize.Format()}, captureSize: {captureSize.Format()}.");
 
         if (wasSizeOutOfBounds)
         {
@@ -115,7 +147,7 @@ public static class SatelliteCartography
             return null;
         }
 
-        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, CartographyType.Satellite, configurationSource.Path);
+        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, CartographyType.Satellite, configurationSource.Path, captureRect);
 
         renderCamera.transform.SetPositionAndRotation(CartographyTool.CaptureBounds.center with
         {
@@ -125,7 +157,7 @@ public static class SatelliteCartography
         renderCamera.aspect = CartographyTool.CaptureSize.x / CartographyTool.CaptureSize.y;
         renderCamera.orthographicSize = CartographyTool.CaptureSize.y * 0.5f;
 
-        RenderTexture rt = RenderTexture.GetTemporary(superSampleSize.x, superSampleSize.y, 32);
+        RenderTexture rt = RenderTexture.GetTemporary(superSampleRect.width, superSampleRect.height, 32);
 
         rt.name = "Satellite";
         rt.filterMode = FilterMode.Bilinear;
@@ -194,7 +226,7 @@ public static class SatelliteCartography
             hideFlags = HideFlags.HideAndDontSave
         };
 
-        RenderTexture recaptureTarget = RenderTexture.GetTemporary(imgSize.x, imgSize.y);
+        RenderTexture recaptureTarget = RenderTexture.GetTemporary(captureRect.width, captureRect.height);
 
         Graphics.Blit(rt, recaptureTarget);
 
@@ -203,7 +235,22 @@ public static class SatelliteCartography
         RenderTexture? oldActive = RenderTexture.active;
         RenderTexture.active = recaptureTarget;
 
-        texture.ReadPixels(new Rect(0f, 0f, imgSize.x, imgSize.y), 0, 0);
+        Vector2Int capturePos = default;
+
+        if (imgSize.x > captureSize.x)
+            capturePos.x = (imgSize.x - captureSize.x) / 2;
+
+        if (captureSize.y < imgSize.y)
+            capturePos.y = (imgSize.y - captureSize.y) / 2;
+
+        if (captureSize != imgSize && configData is CompositorPipeline pipeline)
+        {
+            Color32[] pixels = new Color32[imgSize.x * imgSize.y];
+            Array.Fill(pixels, pipeline.BackgroundColor);
+            texture.SetPixels32(pixels);
+        }
+
+        texture.ReadPixels(new Rect(0, 0, captureRect.width, captureRect.height), capturePos.x, capturePos.y, false);
 
         RenderTexture.active = oldActive;
         RenderTexture.ReleaseTemporary(recaptureTarget);

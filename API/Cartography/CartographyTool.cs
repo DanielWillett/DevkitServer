@@ -1,4 +1,6 @@
-﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools;
+using DevkitServer.API.Cartography.Compositors;
+using DevkitServer.Core.Cartography;
 using SDG.Framework.Water;
 
 namespace DevkitServer.API.Cartography;
@@ -144,9 +146,17 @@ public static class CartographyTool
     /// Considering <see cref="SystemInfo.maxTextureSize"/>, returns the desirable size for a satellite or chart image.
     /// </summary>
     /// <param name="wasSizeOutOfBounds">Was the return value of this function clamped?</param>
-    public static Vector2Int GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds)
+    public static Vector2Int GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds, LevelCartographyConfigData? configData = null)
     {
-        Vector2Int imgSize = ImageSize;
+        Vector2Int imgSize;
+#if CLIENT
+        if (configData is CompositorPipeline { ImageSize: { x: > 0 and <= 32767, y: > 0 and <= 32767 } size })
+            imgSize = size;
+        else
+            imgSize = ImageSize;
+#else
+        imgSize = ImageSize;
+#endif
 
         int maxTextureSize = DevkitServerUtility.MaxTextureDimensionSize;
 
@@ -181,9 +191,17 @@ public static class CartographyTool
     /// <param name="superSampleSize">Used for satellite renders, returns the size for the supersampled texture (which will usually be double the return value) before it's scaled down.</param>
     /// <param name="wasSizeOutOfBounds">Was the return value of this function and <paramref name="superSampleSize"/> clamped?</param>
     /// <param name="wasSuperSampleOutOfBounds">Was <paramref name="wasSuperSampleOutOfBounds"/> clamped?</param>
-    public static Vector2Int GetImageSizeCheckMaxTextureSize(out Vector2Int superSampleSize, out bool wasSizeOutOfBounds, out bool wasSuperSampleOutOfBounds)
+    public static Vector2Int GetImageSizeCheckMaxTextureSize(out Vector2Int superSampleSize, out bool wasSizeOutOfBounds, out bool wasSuperSampleOutOfBounds, LevelCartographyConfigData? configData = null)
     {
-        Vector2Int imgSize = ImageSize;
+        Vector2Int imgSize;
+#if CLIENT
+        if (configData is CompositorPipeline { ImageSize: { x: > 0 and <= 32767, y: > 0 and <= 32767 } size })
+            imgSize = size;
+        else
+            imgSize = ImageSize;
+#else
+        imgSize = ImageSize;
+#endif
 
         int superSampleX = imgSize.x * 2, superSampleY = imgSize.y * 2;
 

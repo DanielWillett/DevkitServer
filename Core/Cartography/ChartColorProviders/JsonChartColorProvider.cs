@@ -23,28 +23,46 @@ public class JsonChartColorProvider : RaycastChartColorProvider
     protected Color32 WaterColor;
     protected Color32 FallbackColor;
 
-    public override bool TryInitialize(in CartographyCaptureData data, bool isExplicitlyDefined)
+    public override bool TryInitialize(in CartographyCaptureData data, JsonElement configuration, bool isExplicitlyDefined)
     {
-        string path = Path.Combine(data.Level.path, "Editor", "chart_colors.json");
-        if (!File.Exists(path))
+        string? path = null;
+        if (configuration.ValueKind != JsonValueKind.Undefined &&
+            configuration.TryGetProperty("file", out JsonElement pathElement) &&
+            pathElement.ValueKind == JsonValueKind.String)
         {
-            path = Path.Combine(data.Level.path, "Editor", "Charts.json");
+            string? p = pathElement.GetString();
+            if (!string.IsNullOrWhiteSpace(p))
+                path = data.ConfigurationFilePath == null || Path.IsPathRooted(p) ? p : Path.GetFullPath(p, Path.GetDirectoryName(data.ConfigurationFilePath));
+        }
+
+        if (path == null)
+        {
+            path = Path.Combine(data.Level.path, "Editor", "chart_colors.json");
             if (!File.Exists(path))
             {
-                path = Path.Combine(data.Level.path, "chart_colors.json");
+                path = Path.Combine(data.Level.path, "Editor", "Charts.json");
                 if (!File.Exists(path))
                 {
-                    path = Path.Combine(data.Level.path, "Charts.json");
+                    path = Path.Combine(data.Level.path, "chart_colors.json");
                     if (!File.Exists(path))
                     {
-                        if (isExplicitlyDefined)
-                            Logger.DevkitServer.LogInfo(nameof(JsonChartColorProvider), $"Skipping because there is no chart data at {path.Format()}.");
-                        else
-                            Logger.DevkitServer.LogDebug(nameof(JsonChartColorProvider), $"Skipping because there is no chart data at {path.Format()}.");
-                        return false;
+                        path = Path.Combine(data.Level.path, "Charts.json");
+                        if (!File.Exists(path))
+                        {
+                            if (isExplicitlyDefined)
+                                Logger.DevkitServer.LogInfo(nameof(JsonChartColorProvider), $"Skipping because there is no chart data at {path.Format()}.");
+                            else
+                                Logger.DevkitServer.LogDebug(nameof(JsonChartColorProvider), $"Skipping because there is no chart data at {path.Format()}.");
+                            return false;
+                        }
                     }
                 }
             }
+        }
+        else if (!File.Exists(path))
+        {
+            Logger.DevkitServer.LogWarning(nameof(JsonChartColorProvider), $"Skipping because there is no chart data at {path.Format()}.");
+            return false;
         }
 
         try
@@ -122,9 +140,9 @@ public class JsonChartColorProvider : RaycastChartColorProvider
         MediumColor = Data.MediumColor.GetValueOrDefault(JsonChartColorData.Defaults.MediumColor!.Value) with { a = 255 };
         WaterColor = Data.WaterColor.GetValueOrDefault(JsonChartColorData.Defaults.WaterColor!.Value) with { a = 255 };
         FallbackColor = Data.FallbackColor.GetValueOrDefault(JsonChartColorData.Defaults.FallbackColor!.Value) with { a = 255 };
-        return base.TryInitialize(in data, isExplicitlyDefined);
-
+        return base.TryInitialize(in data, configuration, isExplicitlyDefined);
     }
+
     public override Color32 GetColor(in CartographyCaptureData data, EObjectChart chartType, Transform? transform, int layer, ref RaycastHit hit)
     {
         if (chartType == EObjectChart.WATER)

@@ -1,7 +1,8 @@
-﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools;
 using DevkitServer.API.Cartography;
 using DevkitServer.API.Cartography.ChartColorProviders;
 using SDG.Framework.Landscapes;
+using System.Text.Json;
 
 namespace DevkitServer.Core.Cartography.ChartColorProviders;
 
@@ -41,9 +42,19 @@ public class BundledStripChartColorProvider : RaycastChartColorProvider
         protected set => _layerPixels = value;
     }
 
-    public override bool TryInitialize(in CartographyCaptureData data, bool isExplicitlyDefined)
+    public override bool TryInitialize(in CartographyCaptureData data, JsonElement configuration, bool isExplicitlyDefined)
     {
-        string path = Path.Combine(data.Level.path, "Charts.unity3d");
+        string? path = null;
+        if (configuration.ValueKind != JsonValueKind.Undefined &&
+            configuration.TryGetProperty("chart", out JsonElement pathElement) &&
+            pathElement.ValueKind == JsonValueKind.String)
+        {
+            string? p = pathElement.GetString();
+            if (!string.IsNullOrWhiteSpace(p))
+                path = data.ConfigurationFilePath == null || Path.IsPathRooted(p) ? p : Path.GetFullPath(p, Path.GetDirectoryName(data.ConfigurationFilePath));
+        }
+
+        path ??= Path.Combine(data.Level.path, "Charts.unity3d");
 
         if (!File.Exists(path))
         {
@@ -110,7 +121,7 @@ public class BundledStripChartColorProvider : RaycastChartColorProvider
 
             _layerPixels.AsSpan(5,  9 ).Fill(new Color32(255, 0, 255, 255));
             _layerPixels.AsSpan(17, 15).Fill(new Color32(255, 0, 255, 255));
-            return base.TryInitialize(in data, isExplicitlyDefined);
+            return base.TryInitialize(in data, configuration, isExplicitlyDefined);
         }
 
         Color[] layers = layerStrip.GetPixels(0, 0, layerStrip.width, 1);
@@ -123,7 +134,7 @@ public class BundledStripChartColorProvider : RaycastChartColorProvider
         if (layers.Length < _layerPixels.Length)
             _layerPixels.AsSpan(layers.Length).Fill(new Color32(255, 0, 255, 255));
 
-        return base.TryInitialize(in data, isExplicitlyDefined);
+        return base.TryInitialize(in data, configuration, isExplicitlyDefined);
     }
     public override Color32 GetColor(in CartographyCaptureData data, EObjectChart chartType, Transform? transform, int layer, ref RaycastHit hit)
     {

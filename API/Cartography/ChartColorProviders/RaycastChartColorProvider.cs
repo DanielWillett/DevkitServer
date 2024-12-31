@@ -1,6 +1,7 @@
-﻿using DevkitServer.Core.Cartography;
+using DevkitServer.Core.Cartography;
 using DevkitServer.Core.Cartography.ChartColorProviders;
 using SDG.Framework.Water;
+using System.Text.Json;
 
 namespace DevkitServer.API.Cartography.ChartColorProviders;
 
@@ -14,7 +15,7 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
     private Vector3[] _waterVolumeCenters = null!;
     private Vector3[] _waterVolumeExtents = null!;
 
-    public virtual bool TryInitialize(in CartographyCaptureData data, bool isExplicitlyDefined)
+    public virtual bool TryInitialize(in CartographyCaptureData data, JsonElement configuration, bool isExplicitlyDefined)
     {
         _allWaterVolumes = WaterVolumeManager.Get().GetAllVolumes().ToArray();
         int l = _allWaterVolumes.Count(x => x != null);

@@ -22,6 +22,18 @@
       "description": "When set to 'true', the file will be opened immediately after compositing finishes.",
       "type": "boolean"
     },
+    "image_size_x": {
+      "description": "Width of the output image in pixels. Defaults to the map size.",
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 32767
+    },
+    "image_size_y": {
+      "description": "Height of the output image in pixels. Defaults to the map size.",
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 32767
+    },
     "time": {
       "description": "The world time to set the game to before rendering. This is a standard time string separated by a colon.",
       "type": "string",
@@ -38,12 +50,31 @@
       "anyOf": [
         {
           "description": "A chart color provider type. should be a C# type name like 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.",
+          "type": "string",
+          "enum": [ "BundledStripChartColorProvider", "JsonChartColorProvider" ]
+        },
+        {
+          "description": "A chart color provider type. should be a C# type name like 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.",
           "type": "string"
         },
         {
-          "description": "A color provider type. should be a C# type name like 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.",
-          "type": "string",
-          "enum": [ "BundledStripChartColorProvider", "JsonChartColorProvider" ]
+          "type": "object",
+          "properties": {
+            "type": {
+              "anyOf": [
+                {
+                  "description": "A chart color provider type. should be a C# type name like 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.",
+                  "type": "string"
+                },
+                {
+                  "description": "A chart color provider type. should be a C# type name like 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.",
+                  "type": "string",
+                  "enum": [ "BundledStripChartColorProvider", "JsonChartColorProvider" ]
+                }
+              ]
+            }
+          },
+          "required": [ "type" ]
         }
       ]
     },

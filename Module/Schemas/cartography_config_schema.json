@@ -11,12 +11,31 @@
       "anyOf": [
         {
           "description": "A chart color provider type. should be a C# type name like 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.",
+          "type": "string",
+          "enum": [ "BundledStripChartColorProvider", "JsonChartColorProvider" ]
+        },
+        {
+          "description": "A chart color provider type. should be a C# type name like 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.",
           "type": "string"
         },
         {
-          "description": "A color provider type. should be a C# type name like 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.",
-          "type": "string",
-          "enum": [ "BundledStripChartColorProvider", "JsonChartColorProvider" ]
+          "type": "object",
+          "properties": {
+            "type": {
+              "anyOf": [
+                {
+                  "description": "A chart color provider type. should be a C# type name like 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.",
+                  "type": "string"
+                },
+                {
+                  "description": "A chart color provider type. should be a C# type name like 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.",
+                  "type": "string",
+                  "enum": [ "BundledStripChartColorProvider", "JsonChartColorProvider" ]
+                }
+              ]
+            }
+          },
+          "required": [ "type" ]
         }
       ]
     },

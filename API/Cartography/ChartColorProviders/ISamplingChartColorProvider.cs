@@ -1,4 +1,4 @@
-﻿using DevkitServer.Core.Cartography;
+using DevkitServer.Core.Cartography;
 
 namespace DevkitServer.API.Cartography.ChartColorProviders;
 

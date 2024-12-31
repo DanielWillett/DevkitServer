@@ -44,6 +44,11 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
     /// </summary>
     public string? OutputFile { get; private set; }
 
+    /// <summary>
+    /// Override the size of the image, blank space will be filled with <see cref="BackgroundColor"/>.
+    /// </summary>
+    public Vector2Int? ImageSize { get; private set; }
+
     public CompositorPipeline(string name, Type chartColorProvider, params CartographyCompositorConfigurationInfo[] compositors)
         : this(name)
     {
@@ -106,7 +111,9 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
     {
         // should be ran at end of frame
 
-        Vector2Int imgSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds);
+        Vector2Int imgSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds, this);
+
+        RectInt captureRect = new RectInt(0, 0, imgSize.x, imgSize.y);
 
         if (wasSizeOutOfBounds)
         {
@@ -129,7 +136,7 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
         Stopwatch sw = Stopwatch.StartNew();
 
         Bounds captureBounds = CartographyTool.CaptureBounds;
-        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, Type, FilePath);
+        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, Type, FilePath, captureRect);
         if (!CartographyCompositing.CompositeForeground(outputTexture, Compositors, in data))
         {
             sw.Stop();
@@ -149,12 +156,13 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
     /// <summary>
     /// Read a pipeline from a file.
     /// </summary>
-    public static CompositorPipeline? FromFile(string path)
+    public static CompositorPipeline? FromFile(string path, out JsonDocument document)
     {
         if (!File.Exists(path))
+        {
+            document = null!;
             return null;
-
-        JsonDocument document;
+        }
 
         try
         {
@@ -164,6 +172,7 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
         catch (Exception ex)
         {
             Logger.DevkitServer.LogWarning(nameof(CompositorPipeline), ex, $"Failed to load pipeline file {path.Format()}.");
+            document = JsonDocument.Parse("{}");
             return null;
         }
 
@@ -180,6 +189,7 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
         catch (Exception ex)
         {
             document.Dispose();
+            document = JsonDocument.Parse("{}");
             Logger.DevkitServer.LogWarning(nameof(CompositorPipeline), ex, $"Failed to read pipeline file {path.Format()}.");
             return null;
         }
@@ -281,10 +291,25 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
                 value.Time = element.GetString();
         }
 
+        if (root.TryGetProperty("image_size_x", out JsonElement sizeX)
+            && sizeX.ValueKind == JsonValueKind.Number
+            && root.TryGetProperty("image_size_y", out JsonElement sizeY)
+            && sizeY.ValueKind == JsonValueKind.Number
+            && sizeX.TryGetInt32(out int imageSizeX)
+            && sizeY.TryGetInt32(out int imageSizeY))
+        {
+            value.ImageSize = new Vector2Int(imageSizeX, imageSizeY);
+        }
+        else
+        {
+            value.ImageSize = null;
+        }
+
         if (typeEnum != CartographyType.Chart)
             return;
 
-        if (root.TryGetProperty("override_chart_color_provider", out JsonElement chartColor) || root.TryGetProperty("chart_color_provider", out chartColor))
+        if ((root.TryGetProperty("override_chart_color_provider", out JsonElement chartColor) || root.TryGetProperty("chart_color_provider", out chartColor))
+            && chartColor.ValueKind == JsonValueKind.String)
         {
             value.PreferredChartColorProvider = chartColor.GetString();
         }
