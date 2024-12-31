@@ -1,129 +1,129 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "https://json-schema.org/draft-07/schema",
   "$id": "https://github.com/DanielWillett/DevkitServer/tree/master/Module/Schemas/server_config_schema.json",
   "title": "DevkitServer Configuration (Server)",
   "description": "Defines general server-side settings for DevkitServer.",
   "type": "object",
-    "properties": {
-        "ansi_log": {
-            "description": "Add a log to Unturned/Logs that includes whatever visual ANSI codes are used to color the console.",
-            "type": "boolean"
+  "properties": {
+    "ansi_log": {
+      "description": "Add a log to Unturned/Logs that includes whatever visual ANSI codes are used to color the console.",
+      "type": "boolean"
+    },
+    "terminal_full_rgb_support": {
+      "description": "Full (24-bit RGB) console color support using virtual terminal sequences (works in the Windows command prompt and most web terminals).",
+      "type": "boolean"
+    },
+    "terminal_virtual_sequence_support": {
+      "description": "Basic (4-bit) console color support using virtual terminal sequences (works in most terminals).",
+      "type": "boolean"
+    },
+    "debug_logging": {
+      "description": "Adds extra debug logging from DevkitServer. Helps with diagnosing problems but could lower performance.",
+      "type": "boolean"
+    },
+    "hide_map_name": {
+      "description": "Force connecting users to hide their current map name from steam friends list, Discord rich presence, and the server list. Note that plugins can override this behavior relatively easily.",
+      "type": "boolean"
+    },
+    "walmart_pc_support": {
+      "description": "Removes cosmetic improvements.",
+      "type": "boolean"
+    },
+    "max_password_attempts": {
+      "description": "Maximum number of failed passwords before the connecting user gets put on a join cooldown. 0 or -1 = infinite.",
+      "type": "integer",
+      "minimum": -1
+    },
+    "wrong_password_block_expire_seconds": {
+      "description": "Number of seconds after hitting the max password attempts that it'll reset.",
+      "type": "number"
+    },
+    "new_level_info": {
+      "description": "Options for newly created maps.",
+      "type": "object",
+      "properties": {
+        "gamemode_type": {
+          "description": "Level Type",
+          "type": "string",
+          "enum": [ "Survival", "Horde", "Arena" ]
         },
-        "terminal_full_rgb_support": {
-            "description": "Full (24-bit RGB) console color support using virtual terminal sequences (works in the Windows command prompt and most web terminals).",
-            "type": "boolean"
+        "start_size": {
+          "description": "Starting level size, based on legacy terrain sizes.",
+          "type": "string",
+          "enum": [ "Tiny", "Small", "Medium", "Large", "Insane" ]
         },
-        "terminal_virtual_sequence_support": {
-            "description": "Basic (4-bit) console color support using virtual terminal sequences (works in most terminals).",
-            "type": "boolean"
-        },
-        "debug_logging": {
-            "description": "Adds extra debug logging from DevkitServer. Helps with diagnosing problems but could lower performance.",
-            "type": "boolean"
-        },
-        "hide_map_name": {
-            "description": "Force connecting users to hide their current map name from steam friends list, Discord rich presence, and the server list. Note that plugins can override this behavior relatively easily.",
-            "type": "boolean"
-        },
-        "walmart_pc_support": {
-            "description": "Removes cosmetic improvements.",
-            "type": "boolean"
-        },
-        "max_password_attempts": {
-            "description": "Maximum number of failed passwords before the connecting user gets put on a join cooldown. 0 or -1 = infinite.",
-            "type": "integer",
-            "minimum": -1
-        },
-        "wrong_password_block_expire_seconds": {
-            "description": "Number of seconds after hitting the max password attempts that it'll reset.",
-            "type": "number"
-        },
-        "new_level_info": {
-            "description": "Options for newly created maps.",
-            "type": "object",
-            "properties": {
-                "gamemode_type": {
-                    "description": "Level Type",
-                    "type": "string",
-                    "enum": [ "Survival", "Horde", "Arena" ]
-                },
-                "start_size": {
-                    "description": "Starting level size, based on legacy terrain sizes.",
-                    "type": "string",
-                    "enum": [ "Tiny", "Small", "Medium", "Large", "Insane" ]
-                },
-                "map_owner": {
-                    "description": "SteamID of the 'owner' of the map for map metadata.",
-                    "type": [ "integer", "string" ]
-                }
-            },
-            "required": [ "gamemode_type", "start_size", "map_owner" ]
-        },
-        "disable_map_download": {
-            "description": "Try to read the map from your files instead of downloading it on join. Not recommended.",
-            "type": "boolean"
-        },
-        "admins_are_superusers": {
-            "description": "Admins ('blue hammers', given with the vanilla /admin command) are treated as having the '*' permission which gives them all permissions.",
-            "type": "boolean"
-        },
-        "sync_editor_time": {
-            "description": "When clients change the time in the lighting menu, it will update on all clients.",
-            "type": "boolean"
-        },
-        "sync_editor_weather": {
-            "description": "When clients change the preview weather in the lighting menu, it will update on all clients.",
-            "type": "boolean"
-        },
-        "disable_asset_validation": {
-            "description": "Set this to 'true' to not kick clients for missing or mismatched assets. A message will still be logged.",
-            "type": "boolean"
-        },
-        "max_chart_render_chunk_size": {
-            "description": "The max amount of area in pixels rendered on a chart at once. Lower this if you're crashing due to running out of memory when trying to render a chart.",
-            "type": "boolean"
-        },
-        "default_permissions": {
-            "description": "Default individual permissions a user has.",
-            "type": "array",
-            "items": {
-                "type": "string"
-            },
-            "uniqueItems": true
-        },
-        "default_permission_groups": {
-            "description": "Default permission groups a user has.",
-            "type": "array",
-            "items": {
-                "type": "string"
-            },
-            "uniqueItems": true
-        },
-        "user_savedata_override": {
-            "description": "Override the directory where user savedata is stored.",
-            "type": [ "string", "null" ],
-            "format": "uri-reference"
-        },
-        "max_client_edit_fps": {
-            "description": "Sets the maximum FPS a client can have while sending editor actions like terrain and foliage, which effectively translates to edits per second needed to be processed by the server and all clients. When not editing, client FPS will stay at whatever is in their settings.",
-            "type": "integer"
-        },
-        "high_speed": {
-            "description": "Configure a TCP server to send/receive large packets quicker.",
-            "type": "object",
-            "properties": {
-                "enable_high_speed_support": {
-                    "description": "Enables support for the TCP server.",
-                    "type": "boolean"
-                },
-                "high_speed_tcp_port": {
-                    "description": "Port to use for the TCP server. This needs to be port forwarded.",
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 65535
-                },
-                "required": [ "enable_high_speed_support", "high_speed_tcp_port" ]
-            }
+        "map_owner": {
+          "description": "SteamID of the 'owner' of the map for map metadata.",
+          "type": [ "integer", "string" ]
         }
+      },
+      "required": [ "gamemode_type", "start_size", "map_owner" ]
+    },
+    "disable_map_download": {
+      "description": "Try to read the map from your files instead of downloading it on join. Not recommended.",
+      "type": "boolean"
+    },
+    "admins_are_superusers": {
+      "description": "Admins ('blue hammers', given with the vanilla /admin command) are treated as having the '*' permission which gives them all permissions.",
+      "type": "boolean"
+    },
+    "sync_editor_time": {
+      "description": "When clients change the time in the lighting menu, it will update on all clients.",
+      "type": "boolean"
+    },
+    "sync_editor_weather": {
+      "description": "When clients change the preview weather in the lighting menu, it will update on all clients.",
+      "type": "boolean"
+    },
+    "disable_asset_validation": {
+      "description": "Set this to 'true' to not kick clients for missing or mismatched assets. A message will still be logged.",
+      "type": "boolean"
+    },
+    "max_chart_render_chunk_size": {
+      "description": "The max amount of area in pixels rendered on a chart at once. Lower this if you're crashing due to running out of memory when trying to render a chart.",
+      "type": "boolean"
+    },
+    "default_permissions": {
+      "description": "Default individual permissions a user has.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "default_permission_groups": {
+      "description": "Default permission groups a user has.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "user_savedata_override": {
+      "description": "Override the directory where user savedata is stored.",
+      "type": [ "string", "null" ],
+      "format": "uri-reference"
+    },
+    "max_client_edit_fps": {
+      "description": "Sets the maximum FPS a client can have while sending editor actions like terrain and foliage, which effectively translates to edits per second needed to be processed by the server and all clients. When not editing, client FPS will stay at whatever is in their settings.",
+      "type": "integer"
+    },
+    "high_speed": {
+      "description": "Configure a TCP server to send/receive large packets quicker.",
+      "type": "object",
+      "properties": {
+        "enable_high_speed_support": {
+          "description": "Enables support for the TCP server.",
+          "type": "boolean"
+        },
+        "high_speed_tcp_port": {
+          "description": "Port to use for the TCP server. This needs to be port forwarded.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "required": [ "enable_high_speed_support", "high_speed_tcp_port" ]
+      }
     }
+  }
 }

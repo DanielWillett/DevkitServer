@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using Version = System.Version;
@@ -39,12 +39,13 @@ internal class DevkitServerResources
         new DevkitServerFileResource(Path.Combine("Defaults", "cartography_config.json"), new Version(0, 0, 39, 0)),
 
         // Schemas
-        new DevkitServerFileResource(Path.Combine("Schemas", "client_config_schema.json"), new Version(0, 0, 37, 0)) { Side = Side.Client },
-        new DevkitServerFileResource(Path.Combine("Schemas", "server_config_schema.json"), new Version(0, 0, 37, 0)) { Side = Side.Server },
-        new DevkitServerFileResource(Path.Combine("Schemas", "backup_schema.json"), new Version(0, 0, 28, 0)),
-        new DevkitServerFileResource(Path.Combine("Schemas", "permission_groups_schema.json"), new Version(0, 0, 15, 0)) { Side = Side.Server },
-        new DevkitServerFileResource(Path.Combine("Schemas", "chart_colors_schema.json"), new Version(0, 0, 27, 0)),
-        new DevkitServerFileResource(Path.Combine("Schemas", "cartography_config_schema.json"), new Version(0, 0, 39, 0)),
+        new DevkitServerFileResource(Path.Combine("Schemas", "client_config_schema.json"), new Version(0, 0, 41, 0)) { Side = Side.Client },
+        new DevkitServerFileResource(Path.Combine("Schemas", "server_config_schema.json"), new Version(0, 0, 41, 0)) { Side = Side.Server },
+        new DevkitServerFileResource(Path.Combine("Schemas", "backup_schema.json"), new Version(0, 0, 41, 0)),
+        new DevkitServerFileResource(Path.Combine("Schemas", "permission_groups_schema.json"), new Version(0, 0, 41, 0)) { Side = Side.Server },
+        new DevkitServerFileResource(Path.Combine("Schemas", "chart_colors_schema.json"), new Version(0, 0, 41, 0)),
+        new DevkitServerFileResource(Path.Combine("Schemas", "cartography_config_schema.json"), new Version(0, 0, 41, 0)),
+        new DevkitServerFileResource(Path.Combine("Schemas", "cartography_compositor_pipeline_schema.json"), new Version(0, 0, 41, 0)),
 
         // Root
         new DevkitServerFileResource(@"DevkitServer.module", new Version(0, 0, 17, 0)),
@@ -172,7 +173,7 @@ internal class DevkitServerResources
             LibFwd("DanielWillett.LevelObjectIcons.dll"), new Version(0, 0, 24, 0)) { Side = Side.Client },
 
         new DevkitServerFileResource("Microsoft.Bcl.AsyncInterfaces",
-            Lib("Microsoft.Bcl.AsyncInterfaces", "Microsoft.Bcl.AsyncInterfaces.dll"), new Version(0, 0, 22, 0)),
+            Lib("Microsoft.Bcl.AsyncInterfaces", "Microsoft.Bcl.AsyncInterfaces.dll"), new Version(0, 0, 41, 0)),
         new DevkitServerFileResource("Microsoft.Bcl.AsyncInterfaces.LICENSE",
             Lib("Microsoft.Bcl.AsyncInterfaces", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
@@ -202,29 +203,29 @@ internal class DevkitServerResources
             Lib("System.Memory", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Numerics.Vectors",
-            Lib("System.Numerics.Vectors", "System.Numerics.Vectors.dll"), new Version(0, 0, 22, 0)),
+            Lib("System.Numerics.Vectors", "System.Numerics.Vectors.dll"), new Version(0, 0, 41, 0)),
         new DevkitServerFileResource("System.Numerics.Vectors.LICENSE",
             Lib("System.Numerics.Vectors", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Runtime.CompilerServices.Unsafe",
-            Lib("System.Runtime.CompilerServices.Unsafe", "System.Runtime.CompilerServices.Unsafe.dll"), new Version(0, 0, 22, 0)),
+            Lib("System.Runtime.CompilerServices.Unsafe", "System.Runtime.CompilerServices.Unsafe.dll"), new Version(0, 0, 41, 0)),
         new DevkitServerFileResource("System.Runtime.CompilerServices.Unsafe.LICENSE",
             Lib("System.Runtime.CompilerServices.Unsafe", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Text.Encodings.Web",
-            Lib("System.Text.Encodings.Web", "System.Text.Encodings.Web.dll"), new Version(0, 0, 22, 0)),
+            Lib("System.Text.Encodings.Web", "System.Text.Encodings.Web.dll"), new Version(0, 0, 41, 0)),
         new DevkitServerFileResource("System.Text.Encodings.Web.LICENSE",
             Lib("System.Text.Encodings.Web", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Text.Json",
-            Lib("System.Text.Json", "System.Text.Json.dll"), new Version(0, 0, 22, 0)),
+            Lib("System.Text.Json", "System.Text.Json.dll"), new Version(0, 0, 41, 0)),
         new DevkitServerFileResource("System.Text.Json.LICENSE",
             Lib("System.Text.Json", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Threading.Tasks.Extensions",
-            Lib("System.Threading.Tasks.Extensions", "System.Threading.Tasks.Extensions.dll"), new Version(0, 0, 24, 0)),
+            Lib("System.Threading.Tasks.Extensions", "System.Threading.Tasks.Extensions.dll"), new Version(0, 0, 41, 0)),
         new DevkitServerFileResource("System.Threading.Tasks.Extensions.LICENSE",
-            Lib("System.Threading.Tasks.Extensions", "LICENSE.txt"), new Version(0, 0, 24, 0)),
+            Lib("System.Threading.Tasks.Extensions", "LICENSE.txt"), new Version(0, 0, 41, 0)) { Delete = true },
 
         new DevkitServerFileResource("System.ValueTuple",
             Lib("System.ValueTuple", "System.ValueTuple.dll"), new Version(0, 0, 24, 0)),

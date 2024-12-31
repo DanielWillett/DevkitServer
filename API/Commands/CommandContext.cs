@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Commands.Subsystem;
 using DevkitServer.Multiplayer;
@@ -576,7 +576,7 @@ public class CommandContext : Exception
             return false;
         }
 
-        return DevkitServerUtility.TryParseColor32(GetParamForParse(parameter), out value);
+        return DevkitServerUtility.TryParseColor32(GetParamForParse(parameter), DevkitServerModule.CommandParseLocale, out value);
     }
 
     /// <summary>

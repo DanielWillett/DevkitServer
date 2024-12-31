@@ -1,4 +1,4 @@
-﻿using DevkitServer.API;
+using DevkitServer.API;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using System.Globalization;
@@ -213,9 +213,9 @@ public static class DevkitServerUtility
         steamId = CSteamID.Nil;
         return false;
     }
-    public static unsafe bool TryParseHexColor32(string hex, out Color32 color)
+    public static unsafe bool TryParseHexColor32(ReadOnlySpan<char> hex, out Color32 color)
     {
-        if (string.IsNullOrWhiteSpace(hex))
+        if (hex.IsEmpty)
         {
             color = default;
             return false;
@@ -392,7 +392,7 @@ public static class DevkitServerUtility
         return false;
     }
     [Pure]
-    public static bool TryParseColor32(string str, out Color32 color)
+    public static bool TryParseColor32(ReadOnlySpan<char> str, CultureInfo culture, out Color32 color)
     {
         if (str.Length > 0 && str[0] == '#')
         {
@@ -402,33 +402,36 @@ public static class DevkitServerUtility
             color = default;
             return false;
         }
-        string[] strs = str.Split(SplitChars, StringSplitOptions.RemoveEmptyEntries);
-        if (strs.Length is 3 or 4)
+        if (str.IndexOf(',') >= 0)
         {
-            bool hsv = strs[0].StartsWith("hsv");
-            byte a = byte.MaxValue;
-            int ind = strs[0].IndexOf('(');
-            if (ind != -1 && strs[0].Length > ind + 1) strs[0] = strs[0].Substring(ind + 1);
-            if (!int.TryParse(strs[0], NumberStyles.Number, CultureInfo.InvariantCulture, out int r))
-                goto fail;
-            if (!byte.TryParse(strs[1], NumberStyles.Number, CultureInfo.InvariantCulture, out byte g))
-                goto fail;
-            if (!byte.TryParse(strs[2].Replace(')', ' '), NumberStyles.Number, CultureInfo.InvariantCulture, out byte b))
-                goto fail;
-            if (strs.Length > 3 && !byte.TryParse(strs[3].Replace(')', ' '), NumberStyles.Number, CultureInfo.InvariantCulture, out a))
-                goto fail;
-
-            if (hsv)
+            string[] strs = str.ToString().Split(SplitChars, StringSplitOptions.RemoveEmptyEntries);
+            if (strs.Length is 3 or 4)
             {
-                color = Color.HSVToRGB(r / 360f, g / 100f, b / 100f, false) with { a = a / 255f };
-                return true;
-            }
+                bool hsv = strs[0].StartsWith("hsv");
+                byte a = byte.MaxValue;
+                int ind = strs[0].IndexOf('(');
+                if (ind != -1 && strs[0].Length > ind + 1) strs[0] = strs[0].Substring(ind + 1);
+                if (!int.TryParse(strs[0], NumberStyles.Number, culture, out int r))
+                    goto fail;
+                if (!byte.TryParse(strs[1], NumberStyles.Number, culture, out byte g))
+                    goto fail;
+                if (!byte.TryParse(strs[2].Replace(')', ' '), NumberStyles.Number, culture, out byte b))
+                    goto fail;
+                if (strs.Length > 3 && !byte.TryParse(strs[3].Replace(')', ' '), NumberStyles.Number, culture, out a))
+                    goto fail;
 
-            color = new Color32((byte)(r > 255 ? 255 : (r < 0 ? 0 : r)), g, b, a);
-            return true;
-            fail:
-            color = default;
-            return false;
+                if (hsv)
+                {
+                    color = Color.HSVToRGB(r / 360f, g / 100f, b / 100f, false) with { a = a / 255f };
+                    return true;
+                }
+
+                color = new Color32((byte)(r > 255 ? 255 : (r < 0 ? 0 : r)), g, b, a);
+                return true;
+                fail:
+                color = default;
+                return false;
+            }
         }
         
         if (TryParseHexColor32(str, out color))
@@ -437,8 +440,7 @@ public static class DevkitServerUtility
         CheckPresets();
         for (int i = 0; i < _presets!.Length; ++i)
         {
-            if (string.Compare(_presets[i].Key, str, CultureInfo.InvariantCulture,
-                    CompareOptions.IgnoreCase | CompareOptions.IgnoreKanaType | CompareOptions.IgnoreWidth | CompareOptions.IgnoreNonSpace) == 0)
+            if (str.Equals(_presets[i].Key, StringComparison.InvariantCultureIgnoreCase))
             {
                 color = _presets[i].Value;
                 return true;

@@ -233,9 +233,6 @@
   <data name="System.Threading.Tasks.Extensions" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.Threading.Tasks.Extensions\System.Threading.Tasks.Extensions.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="System.Threading.Tasks.Extensions.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\System.Threading.Tasks.Extensions\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
   <data name="System.ValueTuple" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.ValueTuple\System.ValueTuple.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
@@ -268,6 +265,9 @@
   </data>
   <data name="client_config_schema" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Schemas\client_config_schema.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="cartography_compositor_pipeline_schema" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Schemas\cartography_compositor_pipeline_schema.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="DevkitServer" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\DevkitServer.module;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>

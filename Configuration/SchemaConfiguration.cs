@@ -1,7 +1,5 @@
-﻿extern alias NSJ;
-
+using Newtonsoft.Json;
 using System.Text.Json.Serialization;
-using NSJ::Newtonsoft.Json;
 
 namespace DevkitServer.Configuration;
 

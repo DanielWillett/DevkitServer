@@ -1,8 +1,7 @@
-﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools;
 using DevkitServer.API.Cartography;
 using DevkitServer.API.Cartography.ChartColorProviders;
 using DevkitServer.Configuration;
-using DevkitServer.Util.Encoding;
 using SDG.Framework.Landscapes;
 using System.Text.Json;
 
@@ -50,13 +49,10 @@ public class JsonChartColorProvider : RaycastChartColorProvider
 
         try
         {
-            ArraySegment<byte> bytes;
-
-            using (Utf8JsonPreProcessingStream stream = new Utf8JsonPreProcessingStream(path))
-                bytes = stream.ReadAllBytes();
+            Span<byte> bytes = FileUtil.ReadAllBytesUtf8(path);
 
             Utf8JsonReader reader = new Utf8JsonReader(bytes, DevkitServerConfig.ReaderOptions);
-            Data = JsonSerializer.Deserialize<JsonChartColorData>(ref reader, DevkitServerConfig.SerializerSettings);
+            Data = JsonSerializer.Deserialize<JsonChartColorData>(ref reader, DevkitServerConfig.SerializerSettings)!;
         }
         catch (Exception ex)
         {

@@ -1,4 +1,4 @@
-﻿using DevkitServer.Core.Commands.Subsystem;
+using DevkitServer.Core.Commands.Subsystem;
 using System.Collections.Concurrent;
 
 namespace DevkitServer.Core.Logging.Terminals;
@@ -18,7 +18,7 @@ internal sealed class BackgroundLoggingTerminal : MonoBehaviour, ITerminal
         if (!saveToUnturnedLog)
             return;
 
-        string msg = color.HasValue ? FormattingUtil.WrapMessageWithColor(color.Value, input) : input.ToString();
+        string msg = color.HasValue ? FormattingUtil.WrapMessageWithTerminalColorSequence(color.Value, input) : input.ToString();
 
         _msgQueue.Enqueue(new LogMessage(msg, color, saveToUnturnedLog, severity));
 

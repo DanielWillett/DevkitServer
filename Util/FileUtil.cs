@@ -1,8 +1,9 @@
-﻿using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using DanielWillett.ReflectionTools;
 using DevkitServer.Core.Cartography.Jobs;
 using SDG.Framework.Modules;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Reflection;
 using Unity.Collections;
@@ -38,6 +39,59 @@ public static class FileUtil
             }
         }
     }
+
+    private static readonly HashSet<string> InvalidFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "AUX", "NUL",                                                 // 1, 2, 3 superscripts
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "COM\u00B9", "COM\u00B2", "COM\u00B3",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "LPT\u00B9", "LPT\u00B2", "LPT\u00B3",
+        ".", ".."
+    };
+
+    private static bool IsInvalidFileName(string name) => InvalidFileNames.Contains(name) || name.EndsWith(' ') || name.EndsWith('.');
+    private static bool IsInvalidFileNameChar(char c) => c <= 31 || c is '/' or '\\' or '<' or '>' or ':' or '"' or '|' or '?' or '*';
+
+    /// <summary>
+    /// Fixes a file name (without its extension) to remove invalid characters.
+    /// </summary>
+    [return: NotNullIfNotNull(nameof(mapName))]
+    public static string? CleanFileName(string? mapName)
+    {
+        if (mapName == null)
+            return null;
+
+        if (IsInvalidFileName(mapName))
+        {
+            if (mapName[^1] is ' ' or '.')
+            {
+                return mapName.Length == 1 ? "_" : mapName[..^1];
+            }
+
+            return "_" + mapName;
+        }
+
+        bool anyChanges = false;
+        Span<char> newName = stackalloc char[mapName.Length];
+        int index = 0;
+        for (int i = 0; i < mapName.Length; ++i)
+        {
+            char c = mapName[i];
+            if (IsInvalidFileNameChar(c))
+            {
+                anyChanges = true;
+                continue;
+            }
+
+            newName[index] = c;
+            ++index;
+        }
+
+        if (!anyChanges)
+            return mapName;
+
+        return index == 0 ? "_" : new string(newName[..index]);
+    }
+
 #if SERVER
     [Pure]
     public static string GetUserSavedataLocation(ulong s64, string path, int characterId = 0)
@@ -100,6 +154,16 @@ public static class FileUtil
                 DevkitServerModule.Fault();
             return false;
         }
+    }
+
+    /// <summary>
+    /// Reads all bytes from a file and advnaces past the UTF8 BOM if present.
+    /// </summary>
+    [Pure]
+    public static Span<byte> ReadAllBytesUtf8(string fileName)
+    {
+        byte[] allBytes = File.ReadAllBytes(fileName);
+        return allBytes is [ 0xEF, 0xBB, 0xBF, .. ] ? allBytes.AsSpan(3) : allBytes;
     }
 
     /// <summary>

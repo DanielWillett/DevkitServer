@@ -1,15 +1,22 @@
-﻿#if CLIENT
+using System.Text.Json;
+
+#if CLIENT
 namespace DevkitServer.API.Cartography.Compositors;
 
 /// <summary>
 /// Defines a plugin-implemented cartography compositor.
 /// </summary>
-public readonly struct CartographyCompositorInfo
+public struct CartographyCompositorInfo
 {
     /// <summary>
     /// Type of the color provider. Implements <see cref="ICartographyCompositor"/>.
     /// </summary>
     public Type Type { get; }
+
+    /// <summary>
+    /// Custom configuration that can optionally be provded to a compositor.
+    /// </summary>
+    public JsonElement Config { get; internal set; }
 
     /// <summary>
     /// Plugin that implements the provider.

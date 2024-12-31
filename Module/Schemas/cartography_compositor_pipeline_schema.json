@@ -1,12 +1,39 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema",
-  "$id": "https://github.com/DanielWillett/DevkitServer/tree/master/Module/Schemas/cartography_config_schema.json",
-  "title": "Cartography Config",
-  "description": "Defines overrides for color providers and compositors to use with cartography rendering.",
+  "$id": "https://github.com/DanielWillett/DevkitServer/tree/master/Module/Schemas/cartography_compositor_pipeline_schema.json",
+  "title": "Cartography Compositor Pipeline",
+  "description": "Defines preset pipelines for applying compositor rules to a chart or satellite.",
   "type": "object",
   "properties": {
-    "override_chart_color_provider": {
-      "description": "Override the chart color provider to use. Value should be a C# type name like 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.",
+    "type": {
+      "description": "Defines the type of base image to use. A pipeline with a type of 'None' will start off with a solid color.",
+      "type": "string",
+      "enum": [ "None", "Satellite", "Chart" ]
+    },
+    "name": {
+      "description": "Display name of this pipleine as it will show in-game.",
+      "type": "string"
+    },
+    "output_file": {
+      "description": "Absolute or relative (to this file) path where the composited image will be placed.",
+      "type": "string"
+    },
+    "auto_open": {
+      "description": "When set to 'true', the file will be opened immediately after compositing finishes.",
+      "type": "boolean"
+    },
+    "time": {
+      "description": "The world time to set the game to before rendering. This is a standard time string separated by a colon.",
+      "type": "string",
+      "pattern": "(?:^\\s*(?:0*1{0,1}\\d|0*2[0123])(?:\\s*\\:\\s*0*[12345]{0,1}\\d){0,2}\\s*$)|(?:^\\s*0*[123456789](?:\\:0*[012345]{0,1}\\d){0,2}\\s*(?:[Aa][Mm]|[Pp][Mm])\\s*$)|(?:^\\s*1[012](?:\\:[012345]{0,1}\\d){0,2}\\s*(?:[Aa][Mm]|[Pp][Mm])\\s*$)|(?:^\\s*0*\\.\\d*\\s*$)"
+    },
+    "background_color": {
+      "description": "When 'type' is 'None', this color fills the image before compositing starts.",
+      "type": "string",
+      "pattern": "^(?:(?<!#)(?:[rR][eE][dD]|[gG][rR][eE][eE][nN]|[bB][lL][uU][eE]|[wW][hH][iI][tT][eE]|[bB][lL][aA][cC][kK]|[yY][eE][lL][lL][oO][wW]|[cC][yY][aA][nN]|[mM][aA][gG][eE][nN][tT][aA]|[gG][rR][aAeE][yY]|[cC][lL][eE][aA][rR]))$|^(?:#{0,1}(?:[\\daAbBcCdDeEfF]{8}|[\\daAbBcCdDeEfF]{6}|[\\daAbBcCdDeEfF]{1,4}))$"
+    },
+    "chart_color_provider": {
+      "description": "Defines the chart color provider to use. Value should be a C# type name like 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.",
       "type": "string",
       "anyOf": [
         {
@@ -20,12 +47,7 @@
         }
       ]
     },
-    "time": {
-      "description": "The world time to set the game to before rendering. This is a standard time string separated by a colon.",
-      "type": "string",
-      "pattern": "(?:^\\s*(?:0*1{0,1}\\d|0*2[0123])(?:\\s*\\:\\s*0*[12345]{0,1}\\d){0,2}\\s*$)|(?:^\\s*0*[123456789](?:\\:0*[012345]{0,1}\\d){0,2}\\s*(?:[Aa][Mm]|[Pp][Mm])\\s*$)|(?:^\\s*1[012](?:\\:[012345]{0,1}\\d){0,2}\\s*(?:[Aa][Mm]|[Pp][Mm])\\s*$)|(?:^\\s*0*\\.\\d*\\s*$)"
-    },
-    "override_active_compositors": {
+    "compositors": {
       "description": "Provides an ordered list of compositors to apply. The fist elements will be applied on top of lower ones (they are applied in reverse). Values should be a C# type name like 'OverlayCartographyCompositor'. Some compositors may take additional config in which an object with a 'type' property can be used instead.",
       "type": "array",
       "items": {
@@ -69,5 +91,6 @@
         "enum": [ "GROUND", "IGNORE", "HIGHWAY", "ROAD", "STREET", "PATH", "LARGE", "MEDIUM", "WATER", "CLIFF" ]
       }
     }
-  }
+  },
+  "required": [ "type" ]
 }

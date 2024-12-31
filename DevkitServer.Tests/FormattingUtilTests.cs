@@ -1,4 +1,5 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Globalization;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace DevkitServer.Tests;
 /// <summary>Unit tests for <see cref="DevkitServerUtility"/>.</summary>

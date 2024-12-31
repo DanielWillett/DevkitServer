@@ -1,7 +1,6 @@
-﻿using DevkitServer.API;
+using DevkitServer.API;
 using DevkitServer.API.Permissions;
 using DevkitServer.Configuration.Converters;
-using DevkitServer.Util.Encoding;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -58,6 +57,7 @@ public class DevkitServerConfig
     public static readonly JsonWriterOptions WriterOptions = new JsonWriterOptions { Indented = true, Encoder = Encoder, SkipValidation = false };
     public static readonly JsonWriterOptions CondensedWriterOptions = new JsonWriterOptions { Indented = false, Encoder = Encoder, SkipValidation = false };
     public static readonly JsonReaderOptions ReaderOptions = new JsonReaderOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip, MaxDepth = 32 };
+    public static readonly JsonDocumentOptions DocumentSettings = new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip, MaxDepth = 32 };
     static DevkitServerConfig()
     {
         for (int i = 0; i < Converters.Length; ++i)
@@ -233,11 +233,7 @@ public class DevkitServerConfig
             }
             if (File.Exists(path))
             {
-                ReadOnlySpan<byte> bytes;
-
-                using (Utf8JsonPreProcessingStream stream = new Utf8JsonPreProcessingStream(path))
-                    bytes = stream.ReadAllBytes();
-
+                ReadOnlySpan<byte> bytes = FileUtil.ReadAllBytesUtf8(path);
                 if (bytes.Length > 0)
                 {
                     Utf8JsonReader reader = new Utf8JsonReader(bytes, ReaderOptions);

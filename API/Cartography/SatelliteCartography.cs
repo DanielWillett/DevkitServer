@@ -1,9 +1,11 @@
-﻿using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using DanielWillett.ReflectionTools;
 using DevkitServer.Core.Cartography;
 using SDG.Framework.Water;
 using System.Diagnostics;
 using System.Reflection;
+using System.Text.Json;
+using DevkitServer.API.Cartography.Compositors;
 using UnityEngine.Rendering;
 using GraphicsSettings = SDG.Unturned.GraphicsSettings;
 
@@ -25,9 +27,24 @@ public static class SatelliteCartography
     /// </summary>
     /// <remarks>This does not work on the server build. Passing a custom level info does not affect measurements so only do so if they represent the same level.</remarks>
     /// <returns>The path of the output file created, or <see langword="null"/> if the chart was not rendered.</returns>
-    public static async UniTask<string?> CaptureSatellite(LevelInfo? level = null, string? outputFile = null, CancellationToken token = default)
+    public static async UniTask<string?> CaptureSatellite(LevelInfo? level = null, string? outputFile = null, [InstantHandle] CartographyConfigurationSource configurationSource = default, CancellationToken token = default)
     {
+        LevelCartographyConfigData? configData = null;
+        if (configurationSource.Configuraiton.ValueKind == JsonValueKind.Undefined && configurationSource.Path == null)
+        {
+            configData = LevelCartographyConfigData.ReadFromLevel(level, out JsonDocument configDocument);
+            configurationSource = new CartographyConfigurationSource(configData?.FilePath, configDocument.RootElement);
+        }
+        else if (configurationSource.Path != null)
+        {
+            configData = configurationSource.Path != null ? CompositorPipeline.FromFile(configurationSource.Path) : null;
+        }
+
         await UniTask.SwitchToMainThread(token);
+
+        float oldTime = float.NaN;
+        configData?.SyncTime(out oldTime);
+
         await UniTask.WaitForEndOfFrame(DevkitServerModule.ComponentHost, token);
 
         level ??= Level.info;
@@ -45,7 +62,7 @@ public static class SatelliteCartography
         else
             outputFile = Path.Combine(level.path, "Map.png");
 
-        Texture2D? texture = CaptureSatelliteSync(level, outputFile);
+        Texture2D? texture = CaptureSatelliteSync(level, configData, outputFile, configurationSource);
 
         if (texture == null)
             return null;
@@ -56,6 +73,9 @@ public static class SatelliteCartography
 
         Logger.DevkitServer.LogDebug(nameof(SatelliteCartography), $"Apply texture: {sw.GetElapsedMilliseconds().Format("0.##")} ms.");
 
+        if (float.IsFinite(oldTime))
+            LevelLighting.time = oldTime;
+
         await FileUtil.EncodeAndSaveTexture(texture, outputFile, JpegQuality, token);
 #if DEBUG
         ThreadUtil.assertIsGameThread();
@@ -65,7 +85,7 @@ public static class SatelliteCartography
 
         return outputFile;
     }
-    private static Texture2D? CaptureSatelliteSync(LevelInfo level, string outputFile)
+    private static Texture2D? CaptureSatelliteSync(LevelInfo level, LevelCartographyConfigData? configData, string outputFile, [InstantHandle] CartographyConfigurationSource configurationSource)
     {
         // should be ran at end of frame
 
@@ -95,9 +115,7 @@ public static class SatelliteCartography
             return null;
         }
 
-        LevelCartographyConfigData? configData = LevelCartographyConfigData.ReadFromLevel(level);
-
-        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, false);
+        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, CartographyType.Satellite, configurationSource.Path);
 
         renderCamera.transform.SetPositionAndRotation(CartographyTool.CaptureBounds.center with
         {
@@ -206,7 +224,7 @@ public static class SatelliteCartography
             texture.SetPixels32(c32);
 
         Stopwatch sw = Stopwatch.StartNew();
-        if (!CartographyCompositing.CompositeForeground(texture, configData, in data))
+        if (!CartographyCompositing.CompositeForeground(texture, configData?.GetActiveCompositors(), in data))
         {
             sw.Stop();
             Logger.DevkitServer.LogInfo(nameof(SatelliteCartography), "No compositing was done.");

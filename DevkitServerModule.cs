@@ -1,4 +1,4 @@
-﻿#if CLIENT
+#if CLIENT
 #define TILE_DEBUG_GL
 #endif
 #define TILE_SYNC
@@ -26,6 +26,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security;
+using DevkitServer.API.Cartography.Compositors;
 using UnityEngine.SceneManagement;
 using Module = SDG.Framework.Modules.Module;
 using Version = System.Version;
@@ -145,6 +146,7 @@ public sealed class DevkitServerModule : IModuleNexus
         { "SaveInProgressWillFreeze", "Saving... (saving again will freeze until done)" },
         { "BackingUpInProgress", "Backing up..." },
         { "BackupAndSaveButton", "Backup And Save" },
+        { "CompositePipelinesLabel", "Available Compositor Pipelines" },
         { "TooManyPasswordAttempts", "Too many incorrect password attempts. Try again in {0} second(s)." },
         { "UnknownIPv4AndSteam64", "Unknown IPv4 and Steam64 ID of connecting user - can't join a password-protected server." },
         { "HighSpeedTip", $"Want to download the map faster? Have the server owner set up the <b>high speed</b> server settings in <color=#{
@@ -384,6 +386,14 @@ public sealed class DevkitServerModule : IModuleNexus
 
             _tknSrc = new CancellationTokenSource();
             Logger.DevkitServer.LogInfo("Init", "DevkitServer loading...");
+
+            // early invocation of something throws an error here
+            typeof(Assets)
+                .GetProperty("errors", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)
+                ?.SetValue(null, new List<string>());
+            typeof(Assets)
+                .GetProperty("allMasterBundles", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)
+                ?.SetValue(null, new List<MasterBundleConfig>());
 
             DevkitServerConfig.Reload();
 
@@ -628,6 +638,8 @@ public sealed class DevkitServerModule : IModuleNexus
     }
     private static async UniTask OnLevelStartLoading(LevelInfo level, CancellationToken token)
     {
+        if (Level.isEditor)
+            CompositorPipelineDatabase.OnLevelStarted();
         if (!HasLoadedBundle)
         {
             await TryLoadBundle(null).ToUniTask(ComponentHost);
@@ -646,6 +658,7 @@ public sealed class DevkitServerModule : IModuleNexus
     }
     private static void OnLevelExited()
     {
+        CompositorPipelineDatabase.Shutdown();
         NetId64Registry.Reset();
         
         if (BackupManager == null)
@@ -891,7 +904,16 @@ public sealed class DevkitServerModule : IModuleNexus
             callback?.Invoke();
             yield break;
         }
-        MasterBundleConfig? bundle = BundleConfig ?? Assets.findMasterBundleByPath(path);
+        MasterBundleConfig? bundle;
+        try
+        {
+           bundle = BundleConfig ?? Assets.findMasterBundleByPath(path);
+        }
+        catch (NullReferenceException)
+        {
+            bundle = null;
+        }
+
         if (bundle == null || bundle.assetBundle == null)
         {
             Logger.DevkitServer.LogDebug(nameof(TryLoadBundle), $"Adding DevkitServer Bundle Search Location: {path.Format(false)}.");

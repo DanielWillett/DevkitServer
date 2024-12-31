@@ -1,4 +1,4 @@
-﻿#if DEBUG
+#if DEBUG
 //#define METHOD_LOGGING
 //#define REFLECTION_LOGGING
 //#define PRINT_DATA
@@ -1281,7 +1281,17 @@ public static class NetFactory
     {
         for (int i = 0; i < types.Count; ++i)
         {
-            MethodInfo[] methods = types[i].GetMethods(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+            MethodInfo[] methods;
+            try
+            {
+               methods = types[i].GetMethods(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+            }
+            catch (SystemException ex)
+            {
+                methods = Array.Empty<MethodInfo>();
+                Logger.DevkitServer.LogWarning(Source, ex, $"Unable to load methods of type {types[i].Format()}.");
+            }
+
             for (int m = 0; m < methods.Length; ++m)
             {
                 MethodInfo method = methods[m];
@@ -1340,7 +1350,17 @@ public static class NetFactory
         Assembly dka = Assembly.GetExecutingAssembly();
         for (int i = 0; i < types.Count; ++i)
         {
-            FieldInfo[] fields = types[i].GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+            FieldInfo[] fields;
+            try
+            {
+                fields = types[i].GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+            }
+            catch (SystemException ex)
+            {
+                fields = Array.Empty<FieldInfo>();
+                Logger.DevkitServer.LogWarning(Source, ex, $"Unable to load fields of type {types[i].Format()}.");
+            }
+
             for (int f = 0; f < fields.Length; ++f)
             {
                 if (!fields[f].IsStatic || fields[f].IsIgnored() || !fields[f].FieldType.IsSubclassOf(typeof(BaseNetCall)))

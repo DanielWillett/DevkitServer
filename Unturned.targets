@@ -292,13 +292,6 @@
         </Reference>
       -->
 
-        <PackageReference Include="Newtonsoft.Json" Version="7.0.1">
-            <FusionName>Newtonsoft.Json, Version=7.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed</FusionName>
-            <SpecificVersion>true</SpecificVersion>
-            <Aliases>NSJ</Aliases>
-            <Private>false</Private>
-            <NoWarn>NU1903;NU1701</NoWarn>
-        </PackageReference>
         <Reference Include="AstarPathfindingProject">
             <HintPath>$(SharedManagedPath)\AstarPathfindingProject.dll</HintPath>
             <Private>true</Private>

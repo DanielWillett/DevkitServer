@@ -1,4 +1,4 @@
-﻿using DevkitServer.Configuration;
+using DevkitServer.Configuration;
 using DevkitServer.Core.Logging;
 using DevkitServer.Core.Logging.Loggers;
 using DevkitServer.Core.Logging.Terminals;
@@ -220,7 +220,7 @@ public static class Logger
         {
             if (color.HasValue)
             {
-                ReadOnlySpan<char> fg = FormattingUtil.GetTerminalColorSequenceString(color.Value, false);
+                ReadOnlySpan<char> fg = FormattingUtil.GetTerminalColorSequence(color.Value, false);
                 if (!outputMessage.StartsWith(fg))
                     ANSIFileLogger.LogWriter.Write(fg);
             }

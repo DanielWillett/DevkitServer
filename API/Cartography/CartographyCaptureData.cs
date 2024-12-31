@@ -1,4 +1,4 @@
-﻿namespace DevkitServer.API.Cartography;
+namespace DevkitServer.API.Cartography;
 
 /// <summary>
 /// Stores data for capturing a chart.
@@ -14,6 +14,11 @@ public readonly ref struct CartographyCaptureData
     /// Full path to the output file after rendering.
     /// </summary>
     public readonly string OutputPath;
+
+    /// <summary>
+    /// Full path to the file which drives the configuration for this compositing pipeline if a configuration file was used.
+    /// </summary>
+    public readonly string? ConfigurationFilePath;
 
     /// <summary>
     /// Map coordinates.
@@ -48,9 +53,9 @@ public readonly ref struct CartographyCaptureData
     /// <summary>
     /// Is this a chart or a satellite render?
     /// </summary>
-    public readonly bool IsChart;
+    public readonly CartographyType Type;
 
-    internal CartographyCaptureData(LevelInfo level, string outputPath, Vector2Int imageSize, Vector3 captureSize, Vector3 captureCenter, float seaLevel, bool isChart)
+    internal CartographyCaptureData(LevelInfo level, string outputPath, Vector2Int imageSize, Vector3 captureSize, Vector3 captureCenter, float seaLevel, CartographyType type, string? configurationFilePath)
     {
         Level = level;
         OutputPath = outputPath;
@@ -59,7 +64,8 @@ public readonly ref struct CartographyCaptureData
         CaptureCenter = captureCenter;
         MaxHeight = captureCenter.y + captureSize.y / 2f;
         MinHeight = captureCenter.y - captureSize.y / 2f;
-        IsChart = isChart;
+        Type = type;
+        ConfigurationFilePath = configurationFilePath;
         SeaLevel = seaLevel;
     }
 }

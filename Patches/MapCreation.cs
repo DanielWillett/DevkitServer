@@ -1,4 +1,3 @@
-﻿extern alias NSJ;
 using DanielWillett.ReflectionTools;
 using DevkitServer.Configuration;
 using SDG.Framework.Devkit;
@@ -524,7 +523,7 @@ public static class MapCreation
 
         writer.WriteStartObject();
 
-        foreach (FieldInfo field in fields.Where(x => !x.HasAttributeSafe(typeof(NSJ::Newtonsoft.Json.JsonIgnoreAttribute))))
+        foreach (FieldInfo field in fields.Where(x => !x.HasAttributeSafe(typeof(Newtonsoft.Json.JsonIgnoreAttribute))))
         {
             object defaultValue = field.GetValue(defaultValues);
             object value = field.GetValue(data);

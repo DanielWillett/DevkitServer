@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using DevkitServer.API.Multiplayer;
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;

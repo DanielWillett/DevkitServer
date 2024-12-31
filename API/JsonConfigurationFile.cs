@@ -1,4 +1,4 @@
-﻿using DevkitServer.Configuration;
+using DevkitServer.Configuration;
 using SDG.Framework.Devkit;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -156,9 +156,7 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
 
             if (System.IO.File.Exists(path))
             {
-                using Utf8JsonPreProcessingStream fs = new Utf8JsonPreProcessingStream(path);
-
-                ReadOnlySpan<byte> bytes = fs.ReadAllBytes();
+                ReadOnlySpan<byte> bytes = FileUtil.ReadAllBytesUtf8(path);
 
                 if (bytes.Length > 0)
                 {

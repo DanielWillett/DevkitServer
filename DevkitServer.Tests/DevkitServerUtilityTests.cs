@@ -1,5 +1,6 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Globalization;
 using System.IO;
 
 namespace DevkitServer.Tests;
@@ -66,7 +67,7 @@ public class DevkitServerUtilityTests
     public void TestParseColor32(string colorInput)
     {
         Color32 value = new Color32(0, 102, 255, 153);
-        if (!DevkitServerUtility.TryParseColor32(colorInput, out Color32 color))
+        if (!DevkitServerUtility.TryParseColor32(colorInput, CultureInfo.InvariantCulture, out Color32 color))
             Assert.Fail();
 
         Assert.AreEqual(value, color);
@@ -80,7 +81,7 @@ public class DevkitServerUtilityTests
     public void TestParseColor32NoAlpha(string colorInput)
     {
         Color32 value = new Color32(0, 102, 255, 255);
-        if (!DevkitServerUtility.TryParseColor32(colorInput, out Color32 color))
+        if (!DevkitServerUtility.TryParseColor32(colorInput, CultureInfo.InvariantCulture, out Color32 color))
             Assert.Fail();
 
         Assert.AreEqual(value, color);

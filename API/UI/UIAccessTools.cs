@@ -1,4 +1,4 @@
-﻿#if CLIENT
+#if CLIENT
 using DanielWillett.ReflectionTools;
 using DanielWillett.ReflectionTools.Emit;
 using DevkitServer.Core.UI.Handlers;
@@ -97,6 +97,9 @@ public static class UIAccessTools
     private static readonly InstanceGetter<MenuPlayUI, MenuPlaySingleplayerUI?>? GetMenuPlaySingleplayerUI
         = Accessor.GenerateInstanceGetter<MenuPlayUI, MenuPlaySingleplayerUI?>("singleplayerUI");
 
+    private static readonly InstanceGetter<MenuPlayServerCurationUI, object?>? GetMenuPlayServerCurationRulesUI
+        = Accessor.GenerateInstanceGetter<MenuPlayServerCurationUI, object?>("rulesUI");
+
     private static readonly InstanceGetter<MenuPlayUI, MenuPlayLobbiesUI?>? GetMenuPlayLobbiesUI
         = Accessor.GenerateInstanceGetter<MenuPlayUI, MenuPlayLobbiesUI?>("lobbiesUI");
 
@@ -167,6 +170,7 @@ public static class UIAccessTools
 
     private static readonly Func<object?>? GetItemStoreCartMenu;
     private static readonly Func<object?>? GetItemStoreDetailsMenu;
+    private static readonly Func<object?>? GetItemStoreBundleContentsMenu;
 
     public static EditorUI? EditorUI
     {
@@ -425,6 +429,16 @@ public static class UIAccessTools
             return menuPlayUI != null ? GetMenuPlaySingleplayerUI?.Invoke(menuPlayUI) : null;
         }
     }
+    public static Type? MenuPlayServerCurationRulesUIType { get; } = typeof(Provider).Assembly.GetType("SDG.Unturned.MenuPlayServerCurationRulesUI", false);
+
+    public static object? MenuPlayServerCurationRulesUI
+    {
+        get
+        {
+            MenuPlayServerCurationUI? curationUI = MenuPlayServersUI.serverCurationUI;
+            return curationUI != null ? GetMenuPlayServerCurationRulesUI?.Invoke(curationUI) : null;
+        }
+    }
     public static MenuPlayLobbiesUI? MenuPlayLobbiesUI
     {
         get
@@ -509,8 +523,10 @@ public static class UIAccessTools
     }
     public static Type? ItemStoreCartMenuType { get; } = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.ItemStoreCartMenu", false);
     public static Type? ItemStoreDetailsMenuType { get; } = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.ItemStoreDetailsMenu", false);
+    public static Type? ItemStoreBundleContentsMenuType { get; } = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.ItemStoreBundleContentsMenu", false);
     public static object? ItemStoreCartMenu => GetItemStoreCartMenu?.Invoke();
     public static object? ItemStoreDetailsMenu => GetItemStoreDetailsMenu?.Invoke();
+    public static object? ItemStoreBundleContentsMenu => GetItemStoreBundleContentsMenu?.Invoke();
     public static MenuWorkshopSubmitUI? MenuWorkshopSubmitUI
     {
         get
@@ -1302,6 +1318,37 @@ public static class UIAccessTools
                 {
                     Logger.DevkitServer.LogWarning(Source, "Unable to find type: SDG.Unturned.ItemStoreCartMenu.");
                 }
+
+                /* BUNDLE CONTENTS MENU */
+                rtnType = ItemStoreBundleContentsMenuType;
+                if (rtnType != null)
+                {
+                    field = containerType.GetField("bundleContentsMenu", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public) ??
+                            containerType.GetField("bundleContentsMenuUI", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                    if (field == null || field.IsStatic || !rtnType.IsAssignableFrom(field.FieldType))
+                    {
+                        Logger.DevkitServer.LogWarning(Source, "Unable to find field: ItemStoreMenu.bundleContentsMenu.");
+                    }
+                    else
+                    {
+                        method = new DynamicMethod("ItemStoreBundleContentsMenu_Impl", attr,
+                            CallingConventions.Standard, rtnType,
+                            Type.EmptyTypes, accessTools, true);
+                        il = method.GetILGenerator().AsEmitter();
+                        Label lbl = il.DefineLabel();
+                        il.Emit(OpCodes.Call, accessTools.GetProperty(nameof(ItemStoreMenu), BindingFlags.Public | BindingFlags.Static)!.GetMethod);
+                        il.Emit(OpCodes.Dup);
+                        il.Emit(OpCodes.Brfalse_S, lbl);
+                        il.Emit(OpCodes.Ldfld, field);
+                        il.MarkLabel(lbl);
+                        il.Emit(OpCodes.Ret);
+                        GetItemStoreBundleContentsMenu = (Func<object?>)method.CreateDelegate(typeof(Func<object>));
+                    }
+                }
+                else
+                {
+                    Logger.DevkitServer.LogWarning(Source, "Unable to find type: SDG.Unturned.ItemStoreBundleContentsMenu.");
+                }
             }
             else
             {
@@ -1559,10 +1606,25 @@ public static class UIAccessTools
             {
                 ParentName = nameof(SDG.Unturned.MenuPlayServersUI),
                 Scene = UIScene.Menu,
-                CustomEmitter =
-                    FindUIType(nameof(SDG.Unturned.MenuPlayServersUI))?.GetField("serverListFiltersUI", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } field
-                        ? (_, generator) => generator.Emit(OpCodes.Ldsfld, field)
-                        : null
+                CustomEmitter = FindUIType(nameof(SDG.Unturned.MenuPlayServersUI))?.GetField("serverListFiltersUI", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } field
+                                ? (_, generator) => generator.Emit(OpCodes.Ldsfld, field)
+                                : null
+            });
+
+            Add(new UITypeInfo(nameof(MenuPlayServerCurationUI))
+            {
+                ParentName = nameof(SDG.Unturned.MenuPlayServersUI),
+                Scene = UIScene.Menu,
+                CustomEmitter = FindUIType(nameof(SDG.Unturned.MenuPlayServersUI))?.GetField("serverCurationUI", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } field3
+                                ? (_, generator) => generator.Emit(OpCodes.Ldsfld, field3)
+                                : null
+            });
+
+            Add(new UITypeInfo("MenuPlayServerCurationRulesUI")
+            {
+                ParentName = nameof(MenuPlayServerCurationUI),
+                Scene = UIScene.Menu,
+                EmitProperty = nameof(MenuPlayServerCurationRulesUI)
             });
 
             Add(new UITypeInfo(nameof(MenuPlayServerBookmarksUI))
@@ -1576,17 +1638,18 @@ public static class UIAccessTools
             {
                 ParentName = nameof(SDG.Unturned.MenuPlayUI),
                 Scene = UIScene.Menu,
-                EmitProperty = nameof(MenuPlayServerInfoUI)
+                CustomEmitter = FindUIType(nameof(SDG.Unturned.MenuPlayUI))?.GetField("serverBookmarksUI", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } field4
+                                ? (_, generator) => generator.Emit(OpCodes.Ldsfld, field4)
+                                : null
             });
 
             Add(new UITypeInfo(nameof(SDG.Unturned.MenuPlayServersUI))
             {
                 ParentName = nameof(SDG.Unturned.MenuPlayUI),
                 Scene = UIScene.Menu,
-                CustomEmitter =
-                    FindUIType(nameof(SDG.Unturned.MenuPlayUI))?.GetField("serverListUI", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } field2
-                        ? (_, generator) => generator.Emit(OpCodes.Ldsfld, field2)
-                        : null
+                CustomEmitter = FindUIType(nameof(SDG.Unturned.MenuPlayUI))?.GetField("serverListUI", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } field2
+                                ? (_, generator) => generator.Emit(OpCodes.Ldsfld, field2)
+                                : null
             });
 
             Add(new UITypeInfo(nameof(SDG.Unturned.MenuPlaySingleplayerUI))
@@ -1945,6 +2008,13 @@ public static class UIAccessTools
                 Parent = ItemStoreMenuType ?? typeof(object),
                 Scene = UIScene.Menu,
                 EmitProperty = nameof(ItemStoreDetailsMenu)
+            });
+
+            Add(new UITypeInfo("ItemStoreBundleContentsMenu", hasActiveMember: false)
+            {
+                Parent = ItemStoreMenuType ?? typeof(object),
+                Scene = UIScene.Menu,
+                EmitProperty = nameof(ItemStoreBundleContentsMenu)
             });
 
             try

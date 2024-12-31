@@ -1,7 +1,6 @@
-﻿#if CLIENT
+#if CLIENT
 using DanielWillett.ReflectionTools;
 using DevkitServer.API.Cartography.Compositors;
-using DevkitServer.Core.Cartography;
 using DevkitServer.Core.Cartography.Compositors;
 using DevkitServer.Plugins;
 using System.Diagnostics;
@@ -14,13 +13,13 @@ internal static class CartographyCompositing
         new CartographyCompositorInfo(typeof(OverlayCartographyCompositor), null!, 0, true, true)
     ];
 
-    internal static bool CompositeForeground(Texture2D texture, LevelCartographyConfigData? config, in CartographyCaptureData data)
+    internal static bool CompositeForeground(Texture2D texture, CartographyCompositorConfigurationInfo[]? compositors, in CartographyCaptureData data)
     {
         List<CartographyCompositorInfo> types = new List<CartographyCompositorInfo>(4);
 
         bool isExplicit;
 
-        if (config?.ActiveCompositors == null)
+        if (compositors == null)
         {
             isExplicit = false;
             // plugin compositors
@@ -34,9 +33,13 @@ internal static class CartographyCompositing
         else
         {
             isExplicit = true;
-            for (int i = 0; i < config.ActiveCompositors.Length; i++)
+            for (int i = 0; i < compositors.Length; i++)
             {
-                string compositorName = config.ActiveCompositors[i];
+                ref CartographyCompositorConfigurationInfo configInfo = ref compositors[i];
+                string? compositorName = configInfo.TypeName;
+
+                if (string.IsNullOrEmpty(compositorName))
+                    continue;
 
                 // vanilla
                 CartographyCompositorInfo info = DefaultCompositors
@@ -57,7 +60,7 @@ internal static class CartographyCompositing
                     continue;
                 }
 
-                types.Add(info);
+                types.Add(info with { Config = configInfo.ExtraConfig });
             }
         }
 
@@ -80,69 +83,49 @@ internal static class CartographyCompositing
         bool didAnything = false;
 
         Stopwatch sw = new Stopwatch();
-        
-        foreach (CartographyCompositorInfo info in types)
-        {
-            if (!info.SupportsChart && data.IsChart)
-            {
-                if (info.Plugin != null)
-                    info.Plugin.LogDebug(nameof(CartographyCompositing), $"Skipping compositor {info.Type.Format()} as it doesn't support chart renders.");
-                else
-                    Logger.DevkitServer.LogDebug(nameof(CartographyCompositing), $"Skipping compositor {info.Type.Format()} as it doesn't support chart renders.");
 
+        ReadOnlySpan<CartographyCompositorInfo> span = types.ToSpan();
+
+        for (int i = 0; i < span.Length; ++i)
+        {
+            ref readonly CartographyCompositorInfo info = ref span[i];
+            IDevkitServerLogger logger = info.Plugin ?? Logger.DevkitServer;
+            if (!info.SupportsChart && data.Type == CartographyType.Chart)
+            {
+                logger.LogDebug(nameof(CartographyCompositing), $"Skipping compositor {info.Type.Format()} as it doesn't support chart renders.");
                 continue;
             }
-            if (!info.SupportsSatellite && !data.IsChart)
+            if (!info.SupportsSatellite && data.Type == CartographyType.Satellite)
             {
-                if (info.Plugin != null)
-                    info.Plugin.LogDebug(nameof(CartographyCompositing), $"Skipping compositor {info.Type.Format()} as it doesn't support satellite renders.");
-                else
-                    Logger.DevkitServer.LogDebug(nameof(CartographyCompositing), $"Skipping compositor {info.Type.Format()} as it doesn't support satellite renders.");
-
+                logger.LogDebug(nameof(CartographyCompositing), $"Skipping compositor {info.Type.Format()} as it doesn't support satellite renders.");
                 continue;
             }
 
             try
             {
-                if (info.Plugin != null)
-                    info.Plugin.LogDebug(nameof(CartographyCompositing), $"Applying compositor of type {info.Type.Format()}.");
-                else
-                    Logger.DevkitServer.LogDebug(nameof(CartographyCompositing), $"Applying compositor of type {info.Type.Format()}.");
-                
+                logger.LogDebug(nameof(CartographyCompositing), $"Applying compositor of type {info.Type.Format()}.");
+
                 ICartographyCompositor compositor = (ICartographyCompositor)Activator.CreateInstance(info.Type, true);
 
                 sw.Restart();
 
-                bool compositorDidAnything = compositor.Composite(in data, renderTexture, isExplicit);
+                bool compositorDidAnything = compositor.Composite(in data, renderTexture, isExplicit, info.Config);
 
                 sw.Stop();
 
                 if (compositorDidAnything)
                 {
                     didAnything = true;
-                    if (info.Plugin != null)
-                        info.Plugin.LogInfo(nameof(CartographyCompositing), $"Applied compositor of type {info.Type.Format()} in {sw.GetElapsedMilliseconds().Format("F2")} ms.");
-                    else
-                        Logger.DevkitServer.LogInfo(nameof(CartographyCompositing), $"Applied compositor of type {info.Type.Format()} in {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+                    logger.LogInfo(nameof(CartographyCompositing), $"Applied compositor of type {info.Type.Format()} in {sw.GetElapsedMilliseconds().Format("F2")} ms.");
                 }
                 else
                 {
-                    if (info.Plugin != null)
-                        info.Plugin.LogDebug(nameof(CartographyCompositing), $"Did not use compositor of type {info.Type.Format()} after {sw.GetElapsedMilliseconds().Format("F2")} ms.");
-                    else
-                        Logger.DevkitServer.LogDebug(nameof(CartographyCompositing), $"Did not use compositor of type {info.Type.Format()} after {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+                    logger.LogDebug(nameof(CartographyCompositing), $"Did not use compositor of type {info.Type.Format()} after {sw.GetElapsedMilliseconds().Format("F2")} ms.");
                 }
             }
             catch (Exception ex)
             {
-                if (info.Plugin != null)
-                {
-                    info.Plugin.LogError(nameof(CartographyCompositing), ex, $"Exception thrown while applying compositor of type {info.Type.Format()}.");
-                }
-                else
-                {
-                    Logger.DevkitServer.LogError(nameof(CartographyCompositing), ex, $"Exception thrown while applying compositor of type {info.Type.Format()}.");
-                }
+                logger.LogError(nameof(CartographyCompositing), ex, $"Exception thrown while applying compositor of type {info.Type.Format()}.");
             }
         }
         

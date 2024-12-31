@@ -1,4 +1,5 @@
-﻿using DanielWillett.ReflectionTools;
+using System.ComponentModel;
+using DanielWillett.ReflectionTools;
 using System.Globalization;
 #if CLIENT
 using DevkitServer.Patches;
@@ -15,6 +16,152 @@ public static class LightingUtil
     private static readonly StaticGetter<ELightingTime>? GetLightingTime = Accessor.GenerateStaticGetter<EditorEnvironmentLightingUI, ELightingTime>("selectedTime");
     private static readonly StaticSetter<ELightingTime>? SetLightingTime = Accessor.GenerateStaticSetter<EditorEnvironmentLightingUI, ELightingTime>("selectedTime");
     private static readonly Action? CallUpdateLightingTime = Accessor.GenerateStaticCaller<EditorEnvironmentLightingUI, Action>("updateSelection");
+
+    /// <summary>
+    /// Parse a time string in the form <c>HH[:MM[:SS]] [AM|PM]</c> and convert it to in-game time assignable to <see cref="LevelLighting.time"/>.
+    /// </summary>
+    public static bool TryParseLevelTime(string timeString, IFormatProvider? formatProvider, out float time)
+    {
+        if (float.TryParse(timeString, NumberStyles.Number, formatProvider, out time) && time is >= 0 and <= 1)
+        {
+            if (!uint.TryParse(timeString, NumberStyles.Number, formatProvider, out _))
+            {
+                if (time == 1) time = 0;
+                return true;
+            }
+        }
+
+        if (!TryParseTime(timeString, formatProvider, out uint hrs, out uint mins))
+        {
+            return false;
+        }
+
+        float bias = LevelLighting.bias;
+        float offset, duration;
+        // 6 AM sunrise, 6 PM sunset
+        if (hrs < 6)
+        {
+            // after midnight, before sunrise
+            offset = bias + (1 - bias) / 2;
+            duration = 1 - bias;
+        }
+        else if (hrs >= 18)
+        {
+            // after sunset, before midnight
+            offset = bias;
+            duration = 1 - bias;
+            hrs -= 18;
+        }
+        else
+        {
+            // after sunrise, before sunset
+            offset = 0;
+            duration = bias;
+            hrs -= 6;
+        }
+
+        time = offset + duration * (hrs / 12f + mins / 1440f);
+        return true;
+    }
+
+    /// <summary>
+    /// Parse a time string in the form <c>HH[:MM[:SS]] [AM|PM]</c>.
+    /// </summary>
+    public static bool TryParseTime(string timeString, IFormatProvider? formatProvider, out uint hours, out uint minutes)
+    {
+        ReadOnlySpan<char> timeSpan = timeString.AsSpan().Trim();
+
+        hours = 0; minutes = 0;
+
+        CultureInfo? cultureInfo = formatProvider as CultureInfo;
+
+        DateTimeFormatInfo? formatInfo = cultureInfo?.DateTimeFormat
+                                         ?? (DateTimeFormatInfo?)formatProvider?.GetFormat(typeof(DateTimeFormatInfo));
+
+        cultureInfo ??= CultureInfo.InvariantCulture;
+
+        string colon = formatInfo?.TimeSeparator ?? ":";
+
+        int colonIndex = timeSpan.IndexOf(colon);
+        if (colonIndex != -1 && colonIndex == 0 || colonIndex == timeSpan.Length - 1)
+        {
+            return false;
+        }
+
+
+        string am = formatInfo?.AMDesignator ?? "AM";
+        string pm = formatInfo?.PMDesignator ?? "PM";
+
+        int secondsColon;
+        if (colonIndex != -1)
+        {
+            secondsColon = timeSpan.Slice(colonIndex + 1).IndexOf(colon);
+            if (secondsColon == -1)
+            {
+                for (int j = colonIndex + 1; j < timeSpan.Length; ++j)
+                {
+                    char c = timeSpan[j];
+
+                    if (char.IsWhiteSpace(c))
+                        continue;
+
+                    if (!char.IsDigit(c)
+                        || am.Length > 0 && (c == am[0] || char.ToLower(c) == char.ToLower(am[0], cultureInfo))
+                        || pm.Length > 0 && (c == pm[0] || char.ToLower(c) == char.ToLower(pm[0], cultureInfo)))
+                    {
+                        secondsColon = j;
+                        break;
+                    }
+                }
+
+                if (secondsColon == -1)
+                    secondsColon = timeSpan.Length;
+            }
+            else
+            {
+                secondsColon += colonIndex + 1;
+            }
+        }
+        else secondsColon = timeSpan.Length;
+
+        uint maxHrs = 24, minHrs = 0, hrOffset = 0;
+
+        if (timeSpan.EndsWith(am, StringComparison.InvariantCultureIgnoreCase))
+        {
+            maxHrs = 13;
+            minHrs = 1;
+            timeSpan = timeSpan[..^am.Length];
+            if (secondsColon > timeSpan.Length)
+                secondsColon = timeSpan.Length;
+        }
+        else if (timeSpan.EndsWith(pm, StringComparison.InvariantCultureIgnoreCase))
+        {
+            maxHrs = 13;
+            minHrs = 1;
+            hrOffset = 12;
+            timeSpan = timeSpan[..^am.Length];
+        }
+        if (secondsColon > timeSpan.Length)
+            secondsColon = timeSpan.Length;
+
+        uint mins = 0;
+        if (!uint.TryParse(timeSpan.Slice(0, colonIndex == -1 ? timeSpan.Length : colonIndex), NumberStyles.Number, formatProvider, out uint hrs)
+            || colonIndex != -1 && !uint.TryParse(timeSpan.Slice(colonIndex + 1, secondsColon - colonIndex - 1), NumberStyles.Number, formatProvider, out mins)
+            || hrs >= maxHrs || mins >= 60 || hrs < minHrs)
+        {
+            return false;
+        }
+
+        // 12 AM, 12 PM
+        if (maxHrs == 13 && hrs == 12)
+            hrs = 0;
+
+        hrs += hrOffset;
+
+        hours = hrs;
+        minutes = mins;
+        return true;
+    }
 
     /// <summary>
     /// The selected time in the <see cref="EditorEnvironmentLightingUI"/>.

@@ -1,4 +1,4 @@
-﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools;
 using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Cartography.ChartColorProviders;

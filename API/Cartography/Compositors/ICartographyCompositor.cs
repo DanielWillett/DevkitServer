@@ -1,4 +1,6 @@
-﻿#if CLIENT
+using System.Text.Json;
+
+#if CLIENT
 namespace DevkitServer.API.Cartography.Compositors;
 
 /// <summary>
@@ -22,6 +24,6 @@ public interface ICartographyCompositor
     /// </summary>
     /// <param name="isExplicitlyDefined">If this compositor was explicitly requested by config.</param>
     /// <returns><see langword="true"/> if any changes were made, otherwise <see langword="false"/>.</returns>
-    bool Composite(in CartographyCaptureData data, Lazy<RenderTexture> texture, bool isExplicitlyDefined);
+    bool Composite(in CartographyCaptureData data, Lazy<RenderTexture> texture, bool isExplicitlyDefined, JsonElement configuration);
 }
 #endif

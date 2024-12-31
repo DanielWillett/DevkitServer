@@ -1,7 +1,7 @@
-﻿using System.Runtime.CompilerServices;
-using DanielWillett.SpeedBytes;
+using System.Runtime.CompilerServices;
 
 namespace DevkitServer.Util.Encoding;
+
 public static unsafe class UnsafeBitConverter
 {
     private static int[]? _decimalBuffer;

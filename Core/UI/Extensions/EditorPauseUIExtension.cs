@@ -1,19 +1,20 @@
-﻿#if CLIENT
+#if CLIENT
 using Cysharp.Threading.Tasks;
+using DanielWillett.ReflectionTools;
 using DevkitServer.API;
 using DevkitServer.API.Cartography;
+using DevkitServer.API.Cartography.Compositors;
 using DevkitServer.API.UI.Extensions;
 using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.Configuration;
+using DevkitServer.Core.Cartography;
 using DevkitServer.Levels;
 using DevkitServer.Patches;
 using System.Reflection;
-using DanielWillett.ReflectionTools;
-using DevkitServer.Core.Cartography;
 
 namespace DevkitServer.Core.UI.Extensions;
 [UIExtension(typeof(EditorPauseUI))]
-internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
+internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension, IDisposable
 {
     private int _isPatched;
 
@@ -45,18 +46,27 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
     private readonly ISleekLabel? _satelliteLabel;
     private readonly ISleekLabel? _savingLabel;
     private readonly ISleekButton _saveAndBackupButton;
+    private readonly ISleekScrollView _pipelinesScrollView;
+    private readonly ISleekLabel _pipelinesLabel;
+
+    private Texture2D? _textureChart;
+    private Texture2D? _textureMap;
 
     public EditorPauseUIExtension()
     {
+        Bundle bundle = Bundles.getBundle("/Bundles/Textures/Edit/Icons/EditorPause/EditorPause.unity3d");
         if (Interlocked.Exchange(ref _isPatched, 1) == 0)
             Patch();
+
+        _textureChart = bundle.load<Texture2D>("Chart");
+        _textureMap = bundle.load<Texture2D>("Map");
 
         Logger.DevkitServer.LogDebug(nameof(EditorPauseUIExtension), _container.Format());
 
         if (_chartButton != null)
         {
             _chartingLabel = Glazier.Get().CreateLabel();
-            _chartingLabel.CopyTransformFrom(_chartButton);
+            UIExtensions.CopyTransformFrom(_chartingLabel, _chartButton);
             _chartingLabel.PositionOffset_X -= _chartButton.SizeOffset_X * 2 + 10;
             _chartingLabel.TextAlignment = TextAnchor.MiddleRight;
             _chartingLabel.SizeOffset_X = 300;
@@ -71,7 +81,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
         if (_mapButton != null)
         {
             _satelliteLabel = Glazier.Get().CreateLabel();
-            _satelliteLabel.CopyTransformFrom(_mapButton);
+            UIExtensions.CopyTransformFrom(_satelliteLabel, _mapButton);
             _satelliteLabel.PositionOffset_X -= _mapButton.SizeOffset_X * 2 + 10;
             _satelliteLabel.TextAlignment = TextAnchor.MiddleRight;
             _satelliteLabel.SizeOffset_X = 300;
@@ -88,7 +98,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
         if (_saveButton != null)
         {
             _savingLabel = Glazier.Get().CreateLabel();
-            _savingLabel.CopyTransformFrom(_saveButton);
+            UIExtensions.CopyTransformFrom(_savingLabel, _saveButton);
             _savingLabel.PositionOffset_X -= _saveButton.SizeOffset_X * 2 + 10;
             _savingLabel.TextAlignment = TextAnchor.MiddleRight;
             _savingLabel.SizeOffset_X = 450;
@@ -98,7 +108,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
 
             _container.AddChild(_savingLabel);
 
-            _saveAndBackupButton.CopyTransformFrom(_saveButton);
+            UIExtensions.CopyTransformFrom(_saveAndBackupButton, _saveButton);
             _saveAndBackupButton.PositionOffset_Y -= _saveAndBackupButton.SizeOffset_Y + 10;
         }
         else
@@ -116,6 +126,63 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
         _saveAndBackupButton.OnClicked += OnSaveAndBackupRequested;
 
         _container.AddChild(_saveAndBackupButton);
+
+        _pipelinesScrollView = Glazier.Get().CreateScrollView();
+        _pipelinesScrollView.PositionScale_Y = 0.35f;
+        _pipelinesScrollView.SizeScale_Y = 0.3f;
+        _pipelinesScrollView.SizeOffset_X = 350f;
+        _pipelinesScrollView.ScaleContentToWidth = true;
+
+        _container.AddChild(_pipelinesScrollView);
+
+        _pipelinesLabel = Glazier.Get().CreateLabel();
+        _pipelinesLabel.Text = DevkitServerModule.MainLocalization.Translate("CompositePipelinesLabel");
+        _pipelinesLabel.TextContrastContext = ETextContrastContext.ColorfulBackdrop;
+        _pipelinesLabel.PositionScale_Y = 0.35f;
+        _pipelinesLabel.SizeOffset_X = 350f;
+        _pipelinesLabel.SizeOffset_Y = 30f;
+        _pipelinesLabel.PositionOffset_Y = -30f;
+        _pipelinesLabel.TextAlignment = TextAnchor.MiddleCenter;
+        _pipelinesLabel.TextColor = ESleekTint.FONT;
+
+        _container.AddChild(_pipelinesLabel);
+
+        CompositorPipelineDatabase.Updated += UpdatePipelines;
+        UpdatePipelines();
+        bundle.unload();
+    }
+    public void Dispose()
+    {
+        CompositorPipelineDatabase.Updated -= UpdatePipelines;
+    }
+
+    private void UpdatePipelines()
+    {
+        _pipelinesScrollView.RemoveAllChildren();
+        bool isVisible = false;
+
+        int y = -30;
+
+        foreach (CompositorPipelineReference reference in CompositorPipelineDatabase.Files.OrderByDescending(x => x.Type).ThenBy(x => x.FileName))
+        {
+            isVisible = true;
+            SleekCompositorPipeline button = new SleekCompositorPipeline(reference.FileName, reference.Name, reference.Type, reference.Type switch
+            {
+                CartographyType.Chart => _textureChart,
+                CartographyType.Satellite => _textureMap,
+                _ => null
+            });
+
+            y += 30;
+            button.PositionOffset_Y = y;
+            button.SizeOffset_Y = 30;
+            button.SizeScale_X = 1f;
+            _pipelinesScrollView.AddChild(button);
+        }
+
+        _pipelinesScrollView.ContentSizeOffset = new Vector2(0, y + 30f);
+        _pipelinesScrollView.IsVisible = isVisible;
+        _pipelinesLabel.IsVisible = isVisible;
     }
 
     private static void OnSaveAndBackupRequested(ISleekElement button)

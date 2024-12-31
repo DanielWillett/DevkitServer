@@ -1,6 +1,7 @@
-﻿using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using DanielWillett.ReflectionTools;
 using DevkitServer.API.Cartography.ChartColorProviders;
+using DevkitServer.API.Cartography.Compositors;
 using DevkitServer.Configuration;
 using DevkitServer.Core.Cartography;
 using DevkitServer.Core.Cartography.ChartColorProviders;
@@ -8,6 +9,7 @@ using DevkitServer.Core.Cartography.Jobs;
 using DevkitServer.Plugins;
 using SDG.Framework.Water;
 using System.Diagnostics;
+using System.Text.Json;
 using Unity.Collections;
 using Unity.Jobs;
 using TransformCacheEntry = (UnityEngine.Transform transform, int layer);
@@ -39,9 +41,34 @@ public static class ChartCartography
     /// </summary>
     /// <remarks>This technically works on the server build but has limited functionality (no compositing). Passing a custom level info does not affect measurements so only do so if they represent the same level.</remarks>
     /// <returns>The path of the output file created, or <see langword="null"/> if the chart was not rendered.</returns>
-    public static async UniTask<string?> CaptureChart(LevelInfo? level = null, string? outputFile = null, CancellationToken token = default)
+    public static async UniTask<string?> CaptureChart(LevelInfo? level = null, string? outputFile = null, [InstantHandle] CartographyConfigurationSource configurationSource = default, CancellationToken token = default)
     {
+        string? colorProviderName = null;
+        LevelCartographyConfigData? configData = null;
+        if (configurationSource.Configuraiton.ValueKind == JsonValueKind.Undefined && configurationSource.Path == null)
+        {
+            configData = LevelCartographyConfigData.ReadFromLevel(level, out JsonDocument configDocument);
+            colorProviderName = configData?.PreferredChartColorProvider;
+            configurationSource = new CartographyConfigurationSource(configData?.FilePath, configDocument.RootElement);
+        }
+        else if (configurationSource.Path != null)
+        {
+            if (configurationSource.Configuraiton.ValueKind != JsonValueKind.Undefined
+                && configurationSource.Configuraiton.TryGetProperty("chart_color_provider", out JsonElement colorProviderElement)
+                && colorProviderElement.ValueKind == JsonValueKind.String)
+            {
+                colorProviderName = colorProviderElement.GetString();
+            }
+            configData = configurationSource.Path != null ? CompositorPipeline.FromFile(configurationSource.Path) : null;
+            if (configData != null && !string.IsNullOrWhiteSpace(configData.PreferredChartColorProvider))
+                colorProviderName = configData.PreferredChartColorProvider;
+        }
+
         await UniTask.SwitchToMainThread(token);
+
+        float oldTime = float.NaN;
+        configData?.SyncTime(out oldTime);
+
         await UniTask.WaitForEndOfFrame(DevkitServerModule.ComponentHost, token);
 
         level ??= Level.info;
@@ -61,13 +88,16 @@ public static class ChartCartography
         Texture2D? texture;
         try
         {
-            texture = CaptureChartSync(level, outputFile);
+            texture = CaptureChartSync(level, colorProviderName, configData, outputFile, configurationSource);
         }
         catch (Exception ex)
         {
             Logger.DevkitServer.LogError(nameof(ChartCartography), ex, "Failed to capture chart.");
             return null;
         }
+
+        if (float.IsFinite(oldTime))
+            LevelLighting.time = oldTime;
 
         if (texture == null)
             return null;
@@ -83,7 +113,8 @@ public static class ChartCartography
 
         return outputFile;
     }
-    private static unsafe Texture2D? CaptureChartSync(LevelInfo level, string outputFile)
+
+    private static unsafe Texture2D? CaptureChartSync(LevelInfo level, string? colorProviderName, LevelCartographyConfigData? configData, string outputFile, [InstantHandle] CartographyConfigurationSource configurationSource)
     {
         // must be ran at the end of frame
 #if CLIENT
@@ -101,13 +132,11 @@ public static class ChartCartography
 
         Bounds captureBounds = CartographyTool.CaptureBounds;
 
-        LevelCartographyConfigData? configData = LevelCartographyConfigData.ReadFromLevel(level);
-
-        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, true);
+        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, CartographyType.Chart, configurationSource.Path);
 
         byte[] outputRGB24Image = new byte[imgSize.x * imgSize.y * 3];
 
-        IChartColorProvider? colorProvider = GetChartColorProvider(in data, configData, out ChartColorProviderInfo providerInfo);
+        IChartColorProvider? colorProvider = GetChartColorProvider(in data, colorProviderName, out ChartColorProviderInfo providerInfo);
 
         if (colorProvider == null)
         {
@@ -121,7 +150,7 @@ public static class ChartCartography
             Logger.DevkitServer.LogWarning(nameof(ChartCartography), "Failed to save/load pre-capture state during chart capture. Check for updates or report this as a bug.");
 
         Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Creating chart with image size {data.ImageSize.x.Format()}x{data.ImageSize.y.Format()} = {(data.ImageSize.x * data.ImageSize.y).Format()}px.");
-        
+
         Stopwatch sw = new Stopwatch();
         try
         {
@@ -177,7 +206,7 @@ public static class ChartCartography
 
 #if CLIENT
         sw.Restart();
-        if (!CartographyCompositing.CompositeForeground(outputTexture, configData, in data))
+        if (!CartographyCompositing.CompositeForeground(outputTexture, configData?.GetActiveCompositors(), in data))
         {
             sw.Stop();
             Logger.DevkitServer.LogInfo(nameof(ChartCartography), "No compositing was done.");
@@ -188,7 +217,7 @@ public static class ChartCartography
             Logger.DevkitServer.LogInfo(nameof(ChartCartography), $"Composited chart in {sw.GetElapsedMilliseconds().Format("F2")} ms.");
         }
 #else
-        Logger.DevkitServer.LogInfo(nameof(ChartCartography), $"No compositing was done (because this is a server build).");
+        Logger.DevkitServer.LogInfo(nameof(ChartCartography), "No compositing was done (because this is a server build).");
 #endif
 
         if (captureState != null)
@@ -550,11 +579,11 @@ public static class ChartCartography
     }
 
 
-    private static IChartColorProvider? GetChartColorProvider(in CartographyCaptureData data, LevelCartographyConfigData? config, out ChartColorProviderInfo providerInfo)
+    private static IChartColorProvider? GetChartColorProvider(in CartographyCaptureData data, string? chartColorProvider, out ChartColorProviderInfo providerInfo)
     {
-        if (config != null && !string.IsNullOrWhiteSpace(config.PreferredChartColorProvider))
+        if (!string.IsNullOrWhiteSpace(chartColorProvider))
         {
-            string colorProvider = config.PreferredChartColorProvider;
+            string colorProvider = chartColorProvider;
 
             // vanilla
             ChartColorProviderInfo info = DefaultChartColorProviders
