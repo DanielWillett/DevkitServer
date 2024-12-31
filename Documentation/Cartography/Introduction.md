@@ -66,10 +66,16 @@ The default configuration file looks like this. Any property can be removed and 
    *  Allows overriding specific object, resource, and road chart types
    *  without having to change their .dat files.
    */
-  "chart_type_overrides": { 
-    "cc906876e40f49ab948924b0e457a45d": "IGNORE", // ignore Airport_1 on charts
-    "Path_1": "HIGHWAY"                           // setup the road material 'Path_1' to show as a highway on charts
-  }
+  "chart_type_overrides": {
+    // "cc906876e40f49ab948924b0e457a45d": "IGNORE", // ignore Airport_1
+    // "Path_1": "HIGHWAY"                           // convert the road 'Path_1' to show as a highway
+  },
+
+  /*
+   *  Set a consistant time at at which the satellite image is rendered.
+   *  This prevents shadows depending on the time at which the image was baked.
+   */
+  "time": "12 PM"
 }
 ```
 
