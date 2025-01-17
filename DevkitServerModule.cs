@@ -1,7 +1,3 @@
-#if CLIENT
-#define TILE_DEBUG_GL
-#endif
-#define TILE_SYNC
 using Cysharp.Threading.Tasks;
 using DanielWillett.ReflectionTools;
 using DevkitServer.API;
@@ -40,6 +36,7 @@ using DevkitServer.Players;
 using SDG.Framework.Utilities;
 #if DEBUG
 using DevkitServer.Util.Debugging;
+using HarmonyLib;
 #endif
 #endif
 #if SERVER

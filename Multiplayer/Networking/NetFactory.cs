@@ -662,9 +662,9 @@ public static class NetFactory
     {
         Logger.DevkitServer.LogWarning(Source, "Received message with no listener"
 #if SERVER
-                              + $" from {transportConnection.Format()}"
+                                               + $" from {transportConnection.Format()}"
 #endif
-                              + "."
+                                               + "."
         );
     }
 
@@ -680,9 +680,9 @@ public static class NetFactory
         {
             Logger.DevkitServer.LogWarning(Source, "Received invalid message, can't read length"
 #if SERVER
-                              + $" from {transportConnection.Format()}"
+                                                   + $" from {transportConnection.Format()}"
 #endif
-                              + "."
+                                                   + "."
                 );
             return;
         }
@@ -693,9 +693,9 @@ public static class NetFactory
         {
             Logger.DevkitServer.LogWarning(Source, $"Received invalid message, can't read bytes of length {len.Format()} B"
 #if SERVER
-                              + $" from {transportConnection.Format()}"
+                                                   + $" from {transportConnection.Format()}"
 #endif
-                              + $". Expected length <= {reader.RemainingSegmentLength.Format()}."
+                                                   + $". Expected length <= {reader.RemainingSegmentLength.Format()}."
                 );
             return;
         }
@@ -735,12 +735,15 @@ public static class NetFactory
 #if CLIENT
         // singleplayer
         if (Provider.isServer)
+        {
+            Logger.DevkitServer.LogDebug(Source, "Incoming message for singleplayer. 1");
             return true;
+        }
 #endif
 
-        int bitDiff = NewReceiveBitCount - OldReceiveBitCount;
         if (!reader.ReadBits(OldReceiveBitCount, out uint num))
         {
+            Logger.DevkitServer.LogDebug(Source, $"Failed to read old bit count, invalid message index: {reader.errors}. IsEditing: {DevkitServerModule.IsEditing}. 2");
             value = default;
             __result = false;
             return false;
@@ -753,7 +756,7 @@ public static class NetFactory
             value = msg;
             __result = true;
 #if MESSAGE_ENUM_LOGGING
-            Logger.DevkitServer.LogDebug(Source, $"Incoming message with type: {msg.Format()} (read with vanilla bit count: {OldReceiveBitCount}).");
+            Logger.DevkitServer.LogDebug(Source, $"Incoming message with type: {msg.Format()} (read with vanilla bit count: {OldReceiveBitCount}). 3");
 #endif
             return false;
         }
@@ -764,39 +767,41 @@ public static class NetFactory
             value = msg;
             __result = true;
 #if MESSAGE_ENUM_LOGGING
-            Logger.DevkitServer.LogDebug(Source, $"Incoming message with type: {msg.Format()} (read with vanilla bit count: {OldReceiveBitCount}).");
+            Logger.DevkitServer.LogDebug(Source, $"Incoming message with type: {msg.Format()} (read with vanilla bit count: {OldReceiveBitCount}). 3");
 #endif
             return false;
         }
 #endif
+        int bitDiff = NewReceiveBitCount - OldReceiveBitCount;
         if (DevkitServerModule.IsEditing)
         {
             if (bitDiff != 0)
             {
                 if (!reader.ReadBits(bitDiff, out uint restOfBits))
                 {
-                    Logger.DevkitServer.LogError(Source, $"Unable to read other {bitDiff} bits of a {DevkitServerModule.ColorizedModuleName} message.");
+                    Logger.DevkitServer.LogError(Source, $"Unable to read other {bitDiff} bits of a {DevkitServerModule.ColorizedModuleName} message. 4");
                     value = default;
                     __result = false;
                     return false;
                 }
                 num |= restOfBits << bitDiff;
+#if SERVER
+                msg = (EServerMessage)num;
+#else
+                msg = (EClientMessage)num;
+#endif
             }
 
-            if (num <= ReceiveBlockOffset + BlockSize)
+            if (num < ReceiveBlockOffset + BlockSize)
             {
-#if SERVER
-                value = (EServerMessage)num;
-#else
-                value = (EClientMessage)num;
-#endif
+                value = msg;
                 __result = true;
 #if MESSAGE_ENUM_LOGGING
                 Logger.DevkitServer.LogDebug(Source, $"Incoming message with type: {
                     ((uint)value >= ReceiveBlockOffset
                         ? ((DevkitServerMessage)((uint)value - ReceiveBlockOffset)).ToString().Colorize(DevkitServerModule.ModuleColor)
                         : value.Format())
-                } (read with {DevkitServerModule.ColorizedModuleName} bit count: {NewReceiveBitCount}).");
+                } (read with {DevkitServerModule.ColorizedModuleName} bit count: {NewReceiveBitCount}). 5");
 #endif
             }
             else
@@ -807,17 +812,13 @@ public static class NetFactory
             return false;
         }
 
-#if SERVER
-        value = (EServerMessage)num;
-#else
-        value = (EClientMessage)num;
-#endif
+        value = msg;
         __result = num < ReceiveBlockOffset;
 #if MESSAGE_ENUM_LOGGING
-        Logger.DevkitServer.LogDebug(Source, $"Incoming message with type: {value.Format()} (read with vanilla bit count: {OldReceiveBitCount}).");
+        Logger.DevkitServer.LogDebug(Source, $"Incoming message with type: {value.Format()} (read with vanilla bit count: {OldReceiveBitCount}). 6");
 #endif
 
-        return true;
+        return false;
     }
 
     [UsedImplicitly]
@@ -832,19 +833,22 @@ public static class NetFactory
 #if CLIENT
         // singleplayer
         if (Provider.isServer)
+        {
+            Logger.DevkitServer.LogDebug(Source, "Outgoing message for singleplayer. 7");
             return true;
+        }
 #endif
         
         uint v = (uint)value;
 #if CLIENT
-        if (value == EServerMessage.GetWorkshopFiles | !DevkitServerModule.IsEditing)
+        if (value == EServerMessage.GetWorkshopFiles || !DevkitServerModule.IsEditing)
 #elif SERVER
-        if (value == EClientMessage.DownloadWorkshopFiles | !DevkitServerModule.IsEditing)
+        if (value == EClientMessage.DownloadWorkshopFiles || !DevkitServerModule.IsEditing)
 #endif
         {
             __result = writer.WriteBits(v, OldWriteBitCount);
 #if MESSAGE_ENUM_LOGGING
-            Logger.DevkitServer.LogDebug(Source, $"Outgoing message with type: {value.Format()} (written with vanilla bit count: {OldWriteBitCount}).");
+            Logger.DevkitServer.LogDebug(Source, $"Outgoing message with type: {value.Format()} (written with vanilla bit count: {OldWriteBitCount}). 8");
 #endif
             return false;
         }
@@ -855,7 +859,7 @@ public static class NetFactory
             ((uint)value >= WriteBlockOffset
                 ? ((DevkitServerMessage)((uint)value - WriteBlockOffset)).ToString().Colorize(DevkitServerModule.ModuleColor)
                 : value.Format())
-        } (written with {DevkitServerModule.ColorizedModuleName} bit count: {NewWriteBitCount}).");
+        } (written with {DevkitServerModule.ColorizedModuleName} bit count: {NewWriteBitCount}). 9");
 #endif
         return false;
     }

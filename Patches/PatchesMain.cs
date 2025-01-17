@@ -1,4 +1,4 @@
-﻿#define REFLECTION_TOOLS_ENABLE_HARMONY_LOG
+#define REFLECTION_TOOLS_ENABLE_HARMONY_LOG
 
 using Cysharp.Threading.Tasks;
 using DanielWillett.ReflectionTools;
@@ -1157,7 +1157,7 @@ internal static class PatchesMain
 #endif
     private static bool PatchLevelIncludeHatch(string id, byte[] pendingHash)
     {
-        return !Level.isLoaded;
+        return !DevkitServerModule.IsEditing || !Level.isLoaded;
     }
 #if CLIENT
     private static bool EditorInteractUpdatePrefix()
