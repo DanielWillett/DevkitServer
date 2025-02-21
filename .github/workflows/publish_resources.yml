@@ -20,6 +20,11 @@ jobs:
       with:
         ref: 'master'
         
+    - name: SetupDotNet
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.x.x'
+        
     - name: Decode DevkitServer.Resources .snk
       uses: akiojin/decode-base64-github-action@v0.1.0
       id: decode-base64
