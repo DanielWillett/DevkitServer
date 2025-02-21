@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using Unturned.SystemEx;
@@ -297,5 +297,11 @@ public class HighSpeedConnection : ITransportConnection
         return false;
     }
     public bool TryGetQueryPort(out ushort queryPort) => TryGetConnectionPort(out queryPort);
+
+    public bool TryGetPing(out int pingMs)
+    {
+        pingMs = 0;
+        return false;
+    }
 #endif
 }
