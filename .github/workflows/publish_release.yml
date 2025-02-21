@@ -23,7 +23,7 @@ jobs:
     - name: SetupDotNet
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '5.0.x'
+        dotnet-version: '9.x.x'
         
     - name: Decode DevkitServer .snk
       uses: akiojin/decode-base64-github-action@v0.1.0
