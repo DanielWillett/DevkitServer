@@ -1,8 +1,8 @@
 #if DEBUG
-//#define METHOD_LOGGING
+#define METHOD_LOGGING
 //#define REFLECTION_LOGGING
 //#define PRINT_DATA
-//#define MESSAGE_ENUM_LOGGING
+#define MESSAGE_ENUM_LOGGING
 #endif
 
 using Cysharp.Threading.Tasks;
@@ -19,9 +19,11 @@ using HarmonyLib;
 using SDG.NetPak;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using DanielWillett.SpeedBytes.Formatting;
 #if PRINT_DATA
 using DanielWillett.SpeedBytes.Formatting;
 #endif
@@ -75,6 +77,18 @@ public static class NetFactory
 
     private static Func<PooledTransportConnectionList>? PullFromTransportConnectionListPool;
     internal static readonly NetPakWriter Writer = new NetPakWriter();
+
+#if CLIENT
+    /// <summary>
+    /// If the current user has been accepted.
+    /// </summary>
+    public static bool IsAccepted { get; internal set; }
+
+    /// <summary>
+    /// Invoked when the local user is accepted.
+    /// </summary>
+    public static event Action? OnAccepted;
+#endif
 
     /// <summary>
     /// Offset of the net messages for received data. On the server this would be of type <see cref="EServerMessage"/>, and on the client it would be of type <see cref="EClientMessage"/>.
@@ -155,6 +169,9 @@ public static class NetFactory
 #else
         ReceiveBlockOffset = clientBlockSize;
         WriteBlockOffset = serverBlockSize;
+#endif
+#if CLIENT
+        IsAccepted = false;
 #endif
         // since GetWorkshopFiles and DownloadWorkshopFiles are sent before the client could possibly know if the server is a DevkitServer server,
         // we need to make sure none of the lower bits that overlap with the vanilla block are the same as these.
@@ -482,6 +499,35 @@ public static class NetFactory
         return false;
     }
 
+#if CLIENT
+    internal static void ResetAccepted()
+    {
+        IsAccepted = false;
+        Logger.DevkitServer.LogDebug(Source, "Accepted state reset.");
+    }
+
+    private static void TriggerAccepted()
+    {
+        if (IsAccepted)
+        {
+            Logger.DevkitServer.LogWarning(Source, "This user was accepted twice.");
+        }
+        else
+        {
+            Logger.DevkitServer.LogInfo(Source, "User accepted.");
+            IsAccepted = true;
+            try
+            {
+                OnAccepted?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                Logger.DevkitServer.LogError(Source, ex, "Error thrown in NetFactory.OnAccepted handler.");
+            }
+        }
+    }
+#endif
+
     /// <summary>
     /// Reset the tracked bandwidth statistics.
     /// </summary>
@@ -737,6 +783,10 @@ public static class NetFactory
         if (Provider.isServer)
         {
             Logger.DevkitServer.LogDebug(Source, "Incoming message for singleplayer. 1");
+            if (value == EClientMessage.Accepted)
+            {
+                TriggerAccepted();
+            }
             return true;
         }
 #endif
@@ -796,6 +846,12 @@ public static class NetFactory
             {
                 value = msg;
                 __result = true;
+#if CLIENT
+                if (value == EClientMessage.Accepted)
+                {
+                    TriggerAccepted();
+                }
+#endif
 #if MESSAGE_ENUM_LOGGING
                 Logger.DevkitServer.LogDebug(Source, $"Incoming message with type: {
                     ((uint)value >= ReceiveBlockOffset
@@ -816,6 +872,12 @@ public static class NetFactory
         __result = num < ReceiveBlockOffset;
 #if MESSAGE_ENUM_LOGGING
         Logger.DevkitServer.LogDebug(Source, $"Incoming message with type: {value.Format()} (read with vanilla bit count: {OldReceiveBitCount}). 6");
+#endif
+#if CLIENT
+        if (value == EClientMessage.Accepted)
+        {
+            TriggerAccepted();
+        }
 #endif
 
         return false;

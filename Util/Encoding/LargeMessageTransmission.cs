@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using DevkitServer.API.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
 using System.IO.Compression;
@@ -52,7 +52,8 @@ public class LargeMessageTransmission : IDisposable
     /// If RSA encryption is used.
     /// </summary>
     /// <remarks>Default: <see langword="true"/>.</remarks>
-    public bool UseEncryption { get; set; } = true;
+    [Obsolete("Not yet implemented.")]
+    public bool UseEncryption { get; set; } = false;
 
     /// <summary>
     /// The public key to decrypt the data.

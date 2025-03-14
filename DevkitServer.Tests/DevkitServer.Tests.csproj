@@ -23,7 +23,7 @@
   <Import Project="$(SolutionDir)Common.targets" />
   <ItemGroup>
     <PackageReference Remove="Newtonsoft.Json" />
-    <PackageReference Include="Newtonsoft.Json" Version="9.0.1">
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3">
       <NoWarn>NU1903</NoWarn>
     </PackageReference>
   </ItemGroup>

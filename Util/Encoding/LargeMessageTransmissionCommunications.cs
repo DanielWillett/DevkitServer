@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using DanielWillett.SpeedBytes;
 using DevkitServer.API.Multiplayer;
 using DevkitServer.Configuration;
@@ -1168,7 +1168,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             if (transmission.Handler != null)
             {
                 Logger.DevkitServer.LogInfo(transmission.LogSource, $"Handler ({transmission.Handler.GetType().Format()}: {Environment.NewLine}" +
-                                                                     JsonSerializer.Serialize(transmission.Handler, transmission.HandlerType,
+                                                                     JsonSerializer.Serialize(transmission.Handler, transmission.HandlerType!,
                                                                          DevkitServerConfig.SerializerSettings));
             }
 

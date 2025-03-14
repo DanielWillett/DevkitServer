@@ -1,4 +1,4 @@
-﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools;
 using DanielWillett.ReflectionTools.Formatting;
 using DevkitServer.API;
 using DevkitServer.Configuration;
@@ -6,10 +6,10 @@ using HarmonyLib;
 using SDG.NetPak;
 using System.Reflection;
 using System.Reflection.Emit;
+using DevkitServer.Multiplayer.Networking;
 
 namespace DevkitServer.Patches;
 
-#if SERVER
 
 internal static class ClientAssetIntegrityPatches
 {
@@ -17,6 +17,7 @@ internal static class ClientAssetIntegrityPatches
 
     public static void Patch()
     {
+#if SERVER
         Type? msgHandlerType = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.ServerMessageHandler_ValidateAssets", false, false);
         if (msgHandlerType == null)
         {
@@ -45,9 +46,39 @@ internal static class ClientAssetIntegrityPatches
         {
             Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch client asset integrity request. Failed to patch method: {readMessage.Format()}.");
         }
+#elif CLIENT
+        Type? clientAssetIntegrity = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.ClientAssetIntegrity", false, false);
+        if (clientAssetIntegrity == null)
+        {
+            Logger.DevkitServer.LogWarning(Source, $"Failed to patch client asset integrity loop. Unknown type: {"SDG.Unturned.ClientAssetIntegrity".Colorize(FormattingColorType.Class)}.");
+            return;
+        }
+
+        MethodInfo? sendRequests = clientAssetIntegrity.GetMethod("SendRequests", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance);
+        if (sendRequests == null)
+        {
+            Logger.DevkitServer.LogWarning(Source, $"Failed to patch client asset integrity loop. Failed to find method: {Accessor.Formatter.Format(
+                new MethodDefinition("SendRequests")
+                    .DeclaredIn(clientAssetIntegrity, isStatic: true)
+                    .WithNoParameters()
+                    .ReturningVoid()
+            )}.");
+            return;
+        }
+
+        try
+        {
+            PatchesMain.Patcher.Patch(sendRequests, prefix: Accessor.Active.GetHarmonyMethod(PrefixSendRequests)!);
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch client asset integrity loop. Failed to patch method: {sendRequests.Format()}.");
+        }
+#endif
     }
     public static void Unpatch()
     {
+#if SERVER
         Type? msgHandlerType = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.ServerMessageHandler_ValidateAssets", false, false);
         if (msgHandlerType == null)
             return;
@@ -64,8 +95,27 @@ internal static class ClientAssetIntegrityPatches
         {
             // ignored
         }
+#elif CLIENT
+        Type? clientAssetIntegrity = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.ClientAssetIntegrity", false, false);
+        if (clientAssetIntegrity == null)
+            return;
+
+        MethodInfo? sendRequests = clientAssetIntegrity.GetMethod("SendRequests", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance);
+        if (sendRequests == null)
+            return;
+
+        try
+        {
+            PatchesMain.Patcher.Unpatch(sendRequests, Accessor.GetMethod(PrefixSendRequests)!);
+        }
+        catch
+        {
+            // ignored
+        }
+#endif
     }
 
+#if SERVER
     public static IEnumerable<CodeInstruction> TranspileReadMessage(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
     {
         TranspileContext ctx = new TranspileContext(method, generator, instructions);
@@ -116,5 +166,11 @@ internal static class ClientAssetIntegrityPatches
     {
         return DevkitServerConfig.Config is not { DisableAssetValidation: true };
     }
-}
+#elif CLIENT
+
+    private static bool PrefixSendRequests()
+    {
+        return !DevkitServerModule.IsEditing || Provider.isServer || NetFactory.IsAccepted;
+    }
 #endif
+}

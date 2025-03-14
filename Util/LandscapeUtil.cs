@@ -1,4 +1,4 @@
-﻿//#define TIME_TRANSACTIONS
+//#define TIME_TRANSACTIONS
 using DanielWillett.ReflectionTools;
 using DevkitServer.API;
 using DevkitServer.Multiplayer.Actions;
@@ -500,7 +500,7 @@ public static class LandscapeUtil
         if (apply)
         {
             tile.SetHeightsDelayLOD();
-            tile.SyncHeightmap();
+            tile.SyncDelayedLOD();
             LevelHierarchy.MarkDirty();
         }
     }
@@ -595,7 +595,8 @@ public static class LandscapeUtil
 
         if (apply)
         {
-            tile.data.SetHoles(0, 0, tile.holes);
+            tile.SetHoles();
+            tile.SyncDelayedLOD();
             tile.hasAnyHolesData = true;
             LevelHierarchy.MarkDirty();
         }

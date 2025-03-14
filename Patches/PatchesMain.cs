@@ -21,6 +21,7 @@ using DevkitServer.API.UI;
 using DevkitServer.API.Multiplayer;
 using DevkitServer.Multiplayer.Cryptography;
 using DevkitServer.Multiplayer.Levels;
+using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 #endif
 #if SERVER
@@ -65,9 +66,9 @@ internal static class PatchesMain
         {
             Stopwatch sw = Stopwatch.StartNew();
             Patcher.PatchAll();
+            ClientAssetIntegrityPatches.Patch();
 #if SERVER
             ServerGizmoPatches.Patch();
-            ClientAssetIntegrityPatches.Patch();
 #elif CLIENT
             LevelObjectPatches.OptionalPatches();
             SpawnsEditorPatches.ManualPatches();
@@ -94,9 +95,8 @@ internal static class PatchesMain
             TransportPatcher.ManualUnpatch();
 #if CLIENT
             LightingPatches.DoUnpatching();
-#elif SERVER
-            ClientAssetIntegrityPatches.Unpatch();
 #endif
+            ClientAssetIntegrityPatches.Unpatch();
             DoManualUnpatches();
             Patcher.UnpatchAll(HarmonyId);
             Logger.DevkitServer.LogInfo(Source, $"Finished unpatching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
@@ -485,7 +485,20 @@ internal static class PatchesMain
         }
 #endif
     }
+
 #if CLIENT
+    [HarmonyPatch(typeof(LoadingUI), nameof(LoadingUI.isBlocked)), HarmonyPatch(MethodType.Getter)]
+    [HarmonyPrefix, UsedImplicitly]
+    private static bool LoadingUICheckAccepted(ref bool __result)
+    {
+        if (DevkitServerModule.IsEditing && Provider.isConnected && !NetFactory.IsAccepted)
+        {
+            __result = true;
+            return false;
+        }
+
+        return true;
+    }
     private static IEnumerable<CodeInstruction> AddDevkitServerPluginFrameworkTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator ilGenerator, MethodBase method)
     {
         TranspileContext ctx = new TranspileContext(method, ilGenerator, instructions);

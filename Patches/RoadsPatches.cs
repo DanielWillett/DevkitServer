@@ -1,4 +1,4 @@
-﻿#if CLIENT
+#if CLIENT
 using DanielWillett.ReflectionTools;
 using DevkitServer.API;
 using DevkitServer.API.Abstractions;
@@ -713,7 +713,7 @@ internal static class RoadsPatches
         if (scrollBox == null)
             return true;
 
-        int matIndex = scrollBox.FindIndexOfChild(button.Parent);
+        int matIndex = scrollBox.FindIndexOfChild(button.Parent!);
         if (matIndex < 0 || matIndex >= LevelRoads.materials.Length || matIndex > byte.MaxValue)
             return true;
 

@@ -1,4 +1,4 @@
-﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools;
 using DanielWillett.SpeedBytes;
 using DanielWillett.SpeedBytes.Unity;
 using DevkitServer.API;
@@ -112,7 +112,7 @@ public sealed class TerrainActions
             if (tile == null)
                 continue;
 
-            tile.SyncHeightmap();
+            tile.SyncDelayedLOD();
             Logger.DevkitServer.LogDebug(Source, $"Synced heightmap: {pendingLODUpdate.Key.Format()}.");
             break;
         }

@@ -1,4 +1,4 @@
-﻿#if CLIENT
+#if CLIENT
 using DanielWillett.ReflectionTools;
 using DevkitServer.API;
 using DevkitServer.API.Abstractions;
@@ -345,7 +345,7 @@ internal sealed class EditorClothes : MonoBehaviour
                 MythicAsset? mythic = item.MythicAsset;
                 CenterHeadEffect(null, transform, model);
                 if (mythic != null)
-                    ItemTool.ApplyMythicalEffect(model, mythic.id, EEffectType.HOOK);
+                    ItemTool.ApplyMythicalEffect(model, mythic.id, EEffectType.HEAD_COSMETIC);
             }
             ApplyHairOverride(asset, model);
         }
@@ -362,7 +362,7 @@ internal sealed class EditorClothes : MonoBehaviour
             return;
         Transform childRecursive = rootModel.FindChildRecursive(itemAsset.hairOverride);
         if (childRecursive == null)
-            Assets.reportError(itemAsset, "Cannot find hair override \"" + itemAsset.hairOverride + "\".");
+            Assets.ReportError(itemAsset, "Cannot find hair override \"" + itemAsset.hairOverride + "\".");
         else
         {
             Renderer component = childRecursive.GetComponent<Renderer>();

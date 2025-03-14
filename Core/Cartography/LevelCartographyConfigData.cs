@@ -132,7 +132,7 @@ public class LevelCartographyConfigData : SchemaConfiguration
 
     private void CreateCaches()
     {
-        _dictionaryCache = new Dictionary<Guid, EObjectChart>(ChartOverrides.Count);
+        _dictionaryCache = new Dictionary<Guid, EObjectChart>(ChartOverrides!.Count);
         _roadMaterials = new EObjectChart[LevelRoads.materials.Length];
         for (int i = 0; i < _roadMaterials.Length; ++i)
         {
