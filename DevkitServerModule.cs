@@ -669,7 +669,9 @@ public sealed class DevkitServerModule : IModuleNexus
 #endif
     private static void OnLevelLoaded(int level)
     {
+#if CLIENT
         NetFactory.ResetAccepted();
+#endif
 
         if (level == Level.BUILD_INDEX_MENU)
         {
