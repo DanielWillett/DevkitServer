@@ -918,7 +918,16 @@ public sealed class DevkitServerModule : IModuleNexus
         if (bundle == null || bundle.assetBundle == null)
         {
             Logger.DevkitServer.LogDebug(nameof(TryLoadBundle), $"Adding DevkitServer Bundle Search Location: {path.Format(false)}.");
-            Assets.RequestAddSearchLocation(path, BundleOrigin);
+            while (true)
+            {
+                try
+                {
+                    Assets.RequestAddSearchLocation(path, BundleOrigin);
+                    break;
+                }
+                catch (NullReferenceException) { }
+                yield return null;
+            }
             yield return null;
             yield return new WaitForEndOfFrame();
             while (Assets.isLoading)
