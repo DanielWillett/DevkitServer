@@ -1,4 +1,4 @@
-﻿#if CLIENT
+#if CLIENT
 using DanielWillett.ReflectionTools;
 using DevkitServer.API;
 using DevkitServer.Multiplayer;
@@ -174,6 +174,7 @@ internal static class FoliageEditorPatches
 
     [UsedImplicitly]
     [HarmonyPatch(typeof(FoliageInfoAsset), "addFoliageToSurface")]
+    [HarmonyPatch([ typeof(Vector3), typeof(Vector3), typeof(bool), typeof(bool), typeof(bool) ])]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> AddFoliageToSurfaceTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
     {
