@@ -186,10 +186,8 @@ public static class SatelliteCartography
         LevelLighting.setSeaColor("_SpecularColor", Color.black);
         QualitySettings.lodBias = float.MaxValue;
 
-        object? captureState = CartographyTool.SavePreCaptureState();
-        if (captureState == null)
-            Logger.DevkitServer.LogWarning(nameof(SatelliteCartography), "Failed to save/load pre-capture state during satellite capture. Check for updates or report this as a bug.");
-
+        CartographyTool.SavePreCaptureState();
+        
         FieldInfo? eventDele = typeof(Level).GetField(nameof(Level.onSatellitePreCapture), BindingFlags.NonPublic | BindingFlags.Static);
         if (eventDele == null)
             Logger.DevkitServer.LogWarning(nameof(SatelliteCartography), "Failed to get Level.onSatellitePreCapture. Check for updates or report this as a bug.");
@@ -208,7 +206,7 @@ public static class SatelliteCartography
 
         postCapture?.Invoke();
 
-        CartographyTool.RestorePreCaptureState(captureState);
+        CartographyTool.RestorePreCaptureState();
 
         GraphicsSettings.renderMode = renderMode;
         RenderSettings.fog = fog;

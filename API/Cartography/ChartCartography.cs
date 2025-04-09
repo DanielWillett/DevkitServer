@@ -167,9 +167,7 @@ public static class ChartCartography
             colorProvider.TryInitialize(in data, default, true);
         }
 
-        object? captureState = CartographyTool.SavePreCaptureState();
-        if (captureState == null)
-            Logger.DevkitServer.LogWarning(nameof(ChartCartography), "Failed to save/load pre-capture state during chart capture. Check for updates or report this as a bug.");
+        CartographyTool.SavePreCaptureState();
 
         Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Creating chart with image size {data.ImageSize.x.Format()}x{data.ImageSize.y.Format()} = {(data.ImageSize.x * data.ImageSize.y).Format()}px.");
 
@@ -245,8 +243,7 @@ public static class ChartCartography
         Logger.DevkitServer.LogInfo(nameof(ChartCartography), "No compositing was done (because this is a server build).");
 #endif
 
-        if (captureState != null)
-            CartographyTool.RestorePreCaptureState(captureState);
+        CartographyTool.RestorePreCaptureState();
 
         outputTexture.Apply(false);
 
