@@ -1,4 +1,4 @@
-﻿using DevkitServer.API;
+using DevkitServer.API;
 using DevkitServer.Plugins;
 using SDG.Framework.Modules;
 using System.Reflection;
@@ -20,14 +20,6 @@ internal class AssemblyResolver : IDisposable
             {
                 asmResolver.TriedToLoadLevelObjectIcons = true;
                 Log(" + Module 'LevelObjectIcons' is unsupported because DevkitServer already implements the same LevelObjectIcon UI. " +
-                    "Any referencing modules will be forwarded to DevkitServer.");
-            }),
-
-        new UnsupportedModule("UnturnedUITools", new AssemblyName("UnturnedUITools, Version=1.1.1.0, Culture=neutral, PublicKeyToken=5e66f8e265922cfe"),
-            onTriedToLoad: asmResolver =>
-            {
-                asmResolver.TriedToLoadUIExtensionModule = true;
-                Log(" + Module 'UnturnedUITools' is unsupported because DevkitServer already implements similar extension and UI tools. " +
                     "Any referencing modules will be forwarded to DevkitServer.");
             })
     };

@@ -1,4 +1,4 @@
-﻿using DevkitServer.API.Multiplayer;
+using DevkitServer.API.Multiplayer;
 #if CLIENT
 using System.Reflection;
 using Cysharp.Threading.Tasks;
@@ -94,9 +94,9 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
             _lastIsCancellable = canCancel;
 
             if (DevkitServerModule.IsMainThread)
-                UIAccessTools.SetLoadingCancelVisibility(canCancel);
+                DevkitServerUITools.SetLoadingCancelVisibility(canCancel);
             else
-                DevkitServerUtility.QueueOnMainThread(() => UIAccessTools.SetLoadingCancelVisibility(canCancel));
+                DevkitServerUtility.QueueOnMainThread(() => DevkitServerUITools.SetLoadingCancelVisibility(canCancel));
         }
 
         int upd;

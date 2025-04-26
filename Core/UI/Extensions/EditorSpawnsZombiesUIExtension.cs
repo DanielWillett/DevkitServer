@@ -1,11 +1,12 @@
-﻿#if CLIENT
+#if CLIENT
+using DanielWillett.UITools.API.Extensions;
+using DanielWillett.UITools.API.Extensions.Members;
 using DevkitServer.API.Devkit.Spawns;
-using DevkitServer.API.UI.Extensions;
-using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.Models;
 using DevkitServer.Util.Region;
 
 namespace DevkitServer.Core.UI.Extensions;
+
 [UIExtension(typeof(EditorSpawnsZombiesUI))]
 internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<ZombieSpawnpoint>
 {
@@ -17,46 +18,46 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
         set => LevelVisibility.zombiesVisible = value;
     }
 
-    [ExistingMember("tableButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("tableButtons", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected ISleekButton[]? Tables { get; }
 
-    [ExistingMember("slotButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("slotButtons", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected ISleekButton[]? Tiers { get; }
 
-    [ExistingMember("clothButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("clothButtons", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected ISleekButton[]? Assets { get; }
 
-    [ExistingMember("selectedBox", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("selectedBox", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekBox? SelectedBox;
 
-    [ExistingMember("tableNameField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("tableNameField", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekField? TableNameField;
 
-    [ExistingMember("lootIDField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("lootIDField", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekUInt16Field? LootIdField;
 
-    [ExistingMember("tableColorPicker", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("tableColorPicker", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly SleekColorPicker? TableColorPicker;
 
-    [ExistingMember("megaToggle", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("megaToggle", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekToggle? MegaToggle;
 
-    [ExistingMember("healthField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("healthField", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekUInt16Field? HealthField;
 
-    [ExistingMember("damageField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("damageField", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekUInt8Field? DamageField;
 
-    [ExistingMember("lootIndexField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("lootIndexField", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekUInt8Field? LootIndexField;
 
-    [ExistingMember("xpField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("xpField", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekUInt32Field? XPField;
 
-    [ExistingMember("regenField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("regenField", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekFloat32Field? RegenField;
 
-    [ExistingMember("difficultyGUIDField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("difficultyGUIDField", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekField? DifficultyAssetField;
 
     public EditorSpawnsZombiesUIExtension() : base(new Vector3(0f, 2.125f, 0f), 20f, DistanceMax, SpawnType.Zombie)

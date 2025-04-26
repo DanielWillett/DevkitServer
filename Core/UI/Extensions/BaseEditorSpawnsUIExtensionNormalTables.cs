@@ -1,6 +1,6 @@
-﻿#if CLIENT
+#if CLIENT
+using DanielWillett.UITools.API.Extensions.Members;
 using DevkitServer.API.Devkit.Spawns;
-using DevkitServer.API.UI.Extensions.Members;
 
 namespace DevkitServer.Core.UI.Extensions;
 
@@ -11,19 +11,19 @@ internal abstract class BaseEditorSpawnsUIExtensionNormalTables<T>(Vector3 offse
     protected abstract ISleekButton[]? Tiers { get; }
     protected abstract ISleekButton[]? Tables { get; }
 
-    [ExistingMember("selectedBox", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("selectedBox", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekBox? SelectedBox;
 
-    [ExistingMember("tableNameField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("tableNameField", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekField? TableNameField;
 
-    [ExistingMember("tableIDField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("tableIDField", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekUInt16Field? TableIdField;
 
-    [ExistingMember("tableColorPicker", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("tableColorPicker", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly SleekColorPicker? TableColorPicker;
 
-    [ExistingMember("tierNameField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("tierNameField", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekField? TierName;
     protected void UpdateSpawnName(string name, int index)
     {

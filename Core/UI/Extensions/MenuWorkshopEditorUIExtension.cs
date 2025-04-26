@@ -1,6 +1,6 @@
-﻿#if CLIENT
-using DevkitServer.API.UI.Extensions;
-using DevkitServer.API.UI.Extensions.Members;
+#if CLIENT
+using DanielWillett.UITools.API.Extensions;
+using DanielWillett.UITools.API.Extensions.Members;
 
 namespace DevkitServer.Core.UI.Extensions;
 

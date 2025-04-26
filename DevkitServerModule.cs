@@ -22,21 +22,21 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security;
-using DevkitServer.API.Cartography.Compositors;
 using UnityEngine.SceneManagement;
 using Module = SDG.Framework.Modules.Module;
 using Version = System.Version;
 #if CLIENT
-using DevkitServer.API.UI;
-using DevkitServer.API.UI.Icons;
+using DanielWillett.UITools;
+using DanielWillett.UITools.Util;
+using DevkitServer.API.Cartography.Compositors;
 using DevkitServer.API.UI.Extensions;
+using DevkitServer.API.UI.Icons;
 using DevkitServer.Core.Tools;
 using DevkitServer.Multiplayer.Movement;
 using DevkitServer.Players;
 using SDG.Framework.Utilities;
 #if DEBUG
 using DevkitServer.Util.Debugging;
-using HarmonyLib;
 #endif
 #endif
 #if SERVER
@@ -298,13 +298,6 @@ public sealed class DevkitServerModule : IModuleNexus
 
             AssemblyResolver = new AssemblyResolver();
             AssemblyResolver.ShutdownUnsupportedModules();
-
-#if CLIENT
-            if (AssemblyResolver.TriedToLoadUIExtensionModule)
-            {
-                Compat.UIExtensionManagerCompat.Init();
-            }
-#endif
 
 #if SERVER
             if (!Dedicator.isStandaloneDedicatedServer)
@@ -602,7 +595,7 @@ public sealed class DevkitServerModule : IModuleNexus
 #if CLIENT
         try
         {
-            UIAccessTools.Init();
+            UIAccessor.Init();
 
             foreach (Type type in Accessor.GetTypesSafe()
                          .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x, x.GetAttributeSafe<EarlyTypeInitAttribute>()))
@@ -625,7 +618,10 @@ public sealed class DevkitServerModule : IModuleNexus
                 }
             }
 
-            UIExtensionManager.Reflect(AccessorExtensions.DevkitServer);
+            UnturnedUIToolsNexus.UIExtensionManager = new DevkitServerUIExtensionManager { DebugLogging = true };
+            
+            // includes this module
+            UnturnedUIToolsNexus.Initialize();
         }
         catch (Exception ex)
         {
@@ -676,7 +672,7 @@ public sealed class DevkitServerModule : IModuleNexus
         if (level == Level.BUILD_INDEX_MENU)
         {
 #if CLIENT
-            LoadingUI? loadingUI = UIAccessTools.LoadingUI;
+            LoadingUI? loadingUI = UIAccessor.LoadingUI;
             if (loadingUI == null)
             {
                 Logger.DevkitServer.LogWarning(nameof(OnLevelLoaded), "Unable to find LoadingUI.");
@@ -1068,10 +1064,6 @@ public sealed class DevkitServerModule : IModuleNexus
 
         if (!LaunchOptions.KeepTempFiles.value)
             DevkitServerConfig.ClearTempFolder();
-
-#if CLIENT
-        UIExtensionManager.Shutdown();
-#endif
 
         PluginLoader.Unload();
         _tknSrc?.Cancel();

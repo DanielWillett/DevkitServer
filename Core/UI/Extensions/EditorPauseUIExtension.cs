@@ -1,11 +1,13 @@
 #if CLIENT
 using Cysharp.Threading.Tasks;
 using DanielWillett.ReflectionTools;
+using DanielWillett.UITools;
+using DanielWillett.UITools.API.Extensions;
+using DanielWillett.UITools.API.Extensions.Members;
+using DanielWillett.UITools.Util;
 using DevkitServer.API;
 using DevkitServer.API.Cartography;
 using DevkitServer.API.Cartography.Compositors;
-using DevkitServer.API.UI.Extensions;
-using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.Configuration;
 using DevkitServer.Core.Cartography;
 using DevkitServer.Levels;
@@ -13,8 +15,9 @@ using DevkitServer.Patches;
 using System.Reflection;
 
 namespace DevkitServer.Core.UI.Extensions;
+
 [UIExtension(typeof(EditorPauseUI))]
-internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension, IDisposable
+internal class EditorPauseUIExtension : UIExtension, IUnpatchableExtension, IDisposable
 {
     private int _isPatched;
 
@@ -66,7 +69,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension, ID
         if (_chartButton != null)
         {
             _chartingLabel = Glazier.Get().CreateLabel();
-            UIExtensions.CopyTransformFrom(_chartingLabel, _chartButton);
+            _chartingLabel.CopyTransformFrom(_chartButton);
             _chartingLabel.PositionOffset_X -= _chartButton.SizeOffset_X * 2 + 10;
             _chartingLabel.TextAlignment = TextAnchor.MiddleRight;
             _chartingLabel.SizeOffset_X = 300;
@@ -81,7 +84,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension, ID
         if (_mapButton != null)
         {
             _satelliteLabel = Glazier.Get().CreateLabel();
-            UIExtensions.CopyTransformFrom(_satelliteLabel, _mapButton);
+            _satelliteLabel.CopyTransformFrom(_mapButton);
             _satelliteLabel.PositionOffset_X -= _mapButton.SizeOffset_X * 2 + 10;
             _satelliteLabel.TextAlignment = TextAnchor.MiddleRight;
             _satelliteLabel.SizeOffset_X = 300;
@@ -98,7 +101,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension, ID
         if (_saveButton != null)
         {
             _savingLabel = Glazier.Get().CreateLabel();
-            UIExtensions.CopyTransformFrom(_savingLabel, _saveButton);
+            _savingLabel.CopyTransformFrom(_saveButton);
             _savingLabel.PositionOffset_X -= _saveButton.SizeOffset_X * 2 + 10;
             _savingLabel.TextAlignment = TextAnchor.MiddleRight;
             _savingLabel.SizeOffset_X = 450;
@@ -108,7 +111,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension, ID
 
             _container.AddChild(_savingLabel);
 
-            UIExtensions.CopyTransformFrom(_saveAndBackupButton, _saveButton);
+            _saveAndBackupButton.CopyTransformFrom(_saveButton);
             _saveAndBackupButton.PositionOffset_Y -= _saveAndBackupButton.SizeOffset_Y + 10;
         }
         else
@@ -203,7 +206,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension, ID
     {
         try
         {
-            EditorPauseUIExtension? extension = UIExtensionManager.GetInstance<EditorPauseUIExtension>();
+            EditorPauseUIExtension? extension = UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorPauseUIExtension>();
             OnLevelDataGatherStateUpdated(extension);
         }
         catch (Exception ex) // if this code throws an error it will be very problematic
@@ -293,7 +296,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension, ID
                 $"Failed to patch method: {FormattingUtil.FormatMethod(typeof(ClickedButton), "onClickedMapButton", isStatic: true)}.");
         }
     }
-    void IUnpatchableUIExtension.Unpatch()
+    void IUnpatchableExtension.Unpatch()
     {
         if (Interlocked.Exchange(ref _isPatched, 0) == 0)
             return;
@@ -337,7 +340,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension, ID
 
         UniTask.Create(async () =>
         {
-            EditorPauseUIExtension? extension = UIExtensionManager.GetInstance<EditorPauseUIExtension>();
+            EditorPauseUIExtension? extension = UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorPauseUIExtension>();
 
             SleekButtonIcon? btn = button as SleekButtonIcon;
             if (btn != null)
@@ -382,7 +385,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension, ID
 
         UniTask.Create(async () =>
         {
-            EditorPauseUIExtension? extension = UIExtensionManager.GetInstance<EditorPauseUIExtension>();
+            EditorPauseUIExtension? extension = UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorPauseUIExtension>();
 
             SleekButtonIcon? btn = button as SleekButtonIcon;
             if (btn != null)

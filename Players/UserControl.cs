@@ -1,16 +1,19 @@
-﻿using DanielWillett.ReflectionTools;
-using DanielWillett.ReflectionTools.Emit;
 using DevkitServer.API;
 using DevkitServer.API.Permissions;
-using DevkitServer.API.UI;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer.Networking;
 #if CLIENT
+using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Emit;
 using DevkitServer.Multiplayer;
 using HarmonyLib;
 using SDG.Framework.Devkit;
 using System.Reflection;
 using System.Reflection.Emit;
+using DanielWillett.UITools.Util;
+#endif
+#if SERVER
+using DevkitServer.API.UI;
 #endif
 
 namespace DevkitServer.Players;
@@ -274,11 +277,11 @@ public class UserControl : MonoBehaviour
                 return;
             }
 #if DEBUG
-            PlayerUI? playerUi = UIAccessTools.PlayerUI;
+            PlayerUI? playerUi = UIAccessor.PlayerUI;
             if (playerUi != null)
                 Logger.DevkitServer.LogDebug(Source, "PlayerUI " + (playerUi.gameObject.activeInHierarchy ? "active" : "inactive") +
                                                      " (" + (playerUi.enabled ? "enabled" : "disabled") + "): " + playerUi.gameObject.GetSceneHierarchyPath().Format(false) + ".");
-            EditorUI? editorUi = UIAccessTools.EditorUI;
+            EditorUI? editorUi = UIAccessor.EditorUI;
             if (editorUi != null)
                 Logger.DevkitServer.LogDebug(Source, "EditorUI " + (editorUi.gameObject.activeInHierarchy ? "active" : "inactive") +
                                                      " (" + (editorUi.enabled ? "enabled" : "disabled") + "): " + editorUi.gameObject.GetSceneHierarchyPath().Format(false) + ".");

@@ -1,8 +1,9 @@
-﻿#if CLIENT
+#if CLIENT
+using DanielWillett.UITools.API.Extensions;
+using DanielWillett.UITools.API.Extensions.Members;
+using DanielWillett.UITools.Util;
 using DevkitServer.API;
 using DevkitServer.API.Devkit.Spawns;
-using DevkitServer.API.UI.Extensions;
-using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.Configuration;
 
 namespace DevkitServer.Core.UI.Extensions;
@@ -28,7 +29,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
     [ExistingMember("radiusSlider", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekSlider? RadiusSlider;
 
-    [ExistingMember("rotationSlider", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("rotationSlider", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected readonly ISleekSlider? RotationSlider;
 
     protected override SleekWindow Parent => EditorUI.window;

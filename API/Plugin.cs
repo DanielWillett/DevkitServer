@@ -1,10 +1,9 @@
-﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools;
 using DevkitServer.API.Abstractions;
 using DevkitServer.Core.Logging.Loggers;
 using DevkitServer.Plugins;
 using System.Globalization;
 #if CLIENT
-using DevkitServer.API.UI.Extensions;
 #endif
 
 namespace DevkitServer.API;
@@ -128,12 +127,6 @@ public abstract class Plugin : CoreLogger, IDevkitServerColorPlugin, ICachedTran
         DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultLocalization, MainLocalizationDirectory, _localPrimaryPath, _localEnglishPath);
         Translations = lcl;
     }
-#if CLIENT
-    public void RegisterUIExtension(Type implementationType, Type parentUIType, int priority)
-    {
-        UIExtensionManager.RegisterExtension(new UIExtensionInfo(implementationType, parentUIType, priority, this));
-    }
-#endif
     ITranslationSource ICachedTranslationSourcePlugin.TranslationSource { get; set; } = null!;
     public sealed override string CoreType => this.GetSource();
     public sealed override bool IsSeverityEnabled(Severity severity, object? source) => severity == Severity.Debug && DeveloperMode || base.IsSeverityEnabled(severity, source);

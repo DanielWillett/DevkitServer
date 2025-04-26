@@ -20,6 +20,8 @@ using Unturned.SystemEx;
 using Module = SDG.Framework.Modules.Module;
 using Type = System.Type;
 #if CLIENT
+using DanielWillett.UITools;
+using DanielWillett.UITools.API.Extensions;
 using DevkitServer.API.Cartography.Compositors;
 using DevkitServer.API.UI.Extensions;
 #endif
@@ -29,6 +31,8 @@ public static class PluginLoader
 {
     private static string? _pluginsDir;
     private static string? _libraryDir;
+
+    private static readonly Dictionary<IDevkitServerPlugin, Module> MockModules = new Dictionary<IDevkitServerPlugin, Module>();
 
     /// <summary>
     /// Path to the directory that plugins are read from.
@@ -302,6 +306,7 @@ public static class PluginLoader
                 try
                 {
                     plugin.Unload();
+                    DeinitPlugin(plugin);
                     OnPluginUnloadedEvent.TryInvoke(plugin);
                 }
                 catch (Exception ex2)
@@ -426,6 +431,7 @@ public static class PluginLoader
                 try
                 {
                     plugin.Unload();
+                    DeinitPlugin(plugin);
                 }
                 catch (Exception ex)
                 {
@@ -654,7 +660,20 @@ public static class PluginLoader
         {
             cachedTranslationSourcePlugin.TranslationSource = TranslationSource.FromPlugin(plugin);
         }
+
+#if CLIENT
+        UnturnedUIToolsNexus.UIExtensionManager.RegisterFromModuleAssembly(plugin.Assembly.Assembly, GetMockModule(plugin));
+#endif
     }
+
+    private static void DeinitPlugin(IDevkitServerPlugin plugin)
+    {
+        _ = plugin;
+#if CLIENT
+        // todo: at some point ui extensions should be deregistered
+#endif
+    }
+
     internal static void Unload()
     {
         OnPluginsUnloadingEvent.TryInvoke();
@@ -824,6 +843,27 @@ public static class PluginLoader
     }
 
     /// <summary>
+    /// Gets a representation of a <see cref="IDevkitServerPlugin"/> as a <see cref="Module"/>.
+    /// <para>
+    /// To convert back to a plugin, use <see cref="PluginModuleExtensions.GetDevkitServerPlugin"/> or <see cref="PluginModuleExtensions.TryGetDevkitServerPlugin"/>.
+    /// </para>
+    /// </summary>
+    /// <remarks>This can be used for compatability for libraries that expect a module.</remarks>
+    public static Module GetMockModule(IDevkitServerPlugin plugin)
+    {
+        Module mod;
+        lock (MockModules)
+        {
+            if (!MockModules.TryGetValue(plugin, out mod))
+            {
+                MockModules.Add(plugin, mod = new PluginModule(plugin));
+            }
+        }
+
+        return mod;
+    }
+
+    /// <summary>
     /// Finds an existing, or creates a new <see cref="ModulePlugin"/> for a foreign module (for compatability reasons).
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
@@ -970,6 +1010,7 @@ public class PluginAssembly : CoreLogger
     private readonly List<ChartColorProviderInfo> _chartColorProviders;
     private readonly List<ICustomNetMessageListener> _customNetMessageListeners;
 #if CLIENT
+    private readonly List<DevkitServerUIExtensionInfo> _uiExtensions;
     private readonly List<CartographyCompositorInfo> _cartographyCompositors;
 #endif
     public IReadOnlyList<IDevkitServerPlugin> Plugins { get; }
@@ -986,6 +1027,7 @@ public class PluginAssembly : CoreLogger
     public IReadOnlyList<ChartColorProviderInfo> ChartColorProviders { get; }
     public IReadOnlyList<ICustomNetMessageListener> CustomNetMessageListeners { get; }
 #if CLIENT
+    public IReadOnlyList<DevkitServerUIExtensionInfo> UIExtensions { get; }
     public IReadOnlyList<CartographyCompositorInfo> CartographyCompositors { get; }
 #endif
     public PluginAssembly(Assembly assembly, string file, bool autoPatch = true) : base(assembly.GetName().Name.ToUpperInvariant())
@@ -997,6 +1039,9 @@ public class PluginAssembly : CoreLogger
         _replicatedLevelDataSources = new List<ReplicatedLevelDataSourceInfo>(0);
         _chartColorProviders = new List<ChartColorProviderInfo>(0);
         _customNetMessageListeners = new List<ICustomNetMessageListener>(0);
+#if CLIENT
+        _uiExtensions = new List<DevkitServerUIExtensionInfo>(0);
+#endif
 
         Plugins = _plugins.AsReadOnly();
         NetCalls = _netCalls.AsReadOnly();
@@ -1005,8 +1050,9 @@ public class PluginAssembly : CoreLogger
         ReplicatedLevelDataSources = _replicatedLevelDataSources.AsReadOnly();
         ChartColorProviders = _chartColorProviders.AsReadOnly();
         CustomNetMessageListeners = _customNetMessageListeners.AsReadOnly();
-
 #if CLIENT
+        UIExtensions = _uiExtensions.AsReadOnly();
+
         _cartographyCompositors = new List<CartographyCompositorInfo>(0);
         CartographyCompositors = _cartographyCompositors.AsReadOnly();
 #endif
@@ -1024,6 +1070,9 @@ public class PluginAssembly : CoreLogger
         _replicatedLevelDataSources = new List<ReplicatedLevelDataSourceInfo>(0);
         _chartColorProviders = new List<ChartColorProviderInfo>(0);
         _customNetMessageListeners = new List<ICustomNetMessageListener>(0);
+#if CLIENT
+        _uiExtensions = new List<DevkitServerUIExtensionInfo>(0);
+#endif
 
         Plugins = _plugins.AsReadOnly();
         NetCalls = _netCalls.AsReadOnly();
@@ -1032,8 +1081,9 @@ public class PluginAssembly : CoreLogger
         ReplicatedLevelDataSources = _replicatedLevelDataSources.AsReadOnly();
         ChartColorProviders = _chartColorProviders.AsReadOnly();
         CustomNetMessageListeners = _customNetMessageListeners.AsReadOnly();
-
 #if CLIENT
+        UIExtensions = _uiExtensions.AsReadOnly();
+
         _cartographyCompositors = new List<CartographyCompositorInfo>(0);
         CartographyCompositors = _cartographyCompositors.AsReadOnly();
 #endif
@@ -1055,9 +1105,6 @@ public class PluginAssembly : CoreLogger
         if (!HasReflected)
         {
             HasReflected = true;
-#if CLIENT
-            UIExtensionManager.Reflect(Assembly);
-#endif
             _netMethods.Clear();
             _netCalls.Clear();
             NetFactory.Reflect(Assembly,
@@ -1071,6 +1118,23 @@ public class PluginAssembly : CoreLogger
 
             HierarchyItemTypeIdentifierEx.RegisterFromAssembly(Assembly, _hierarchyItemFactories);
             ReplicatedLevelDataRegistry.RegisterFromAssembly(Assembly, _replicatedLevelDataSources, this);
+#if CLIENT
+            if (UnturnedUIToolsNexus.UIExtensionManager is not DevkitServerUIExtensionManager dsUiExMng)
+            {
+                UnturnedUIToolsNexus.UIExtensionManager.RegisterFromModuleAssembly(Assembly,
+                    Plugins.Count == 1
+                        ? PluginLoader.GetMockModule(Plugins[0])
+                        : new Module(new ModuleConfig
+                        {
+                            Name = Assembly.GetName().Name,
+                            IsEnabled = true
+                        }));
+            }
+            else
+            {
+                dsUiExMng.RegisterFromPluginAssembly(this, _uiExtensions);
+            }
+#endif
 
             List<Type> types = Accessor.GetTypesSafe(Assembly);
 

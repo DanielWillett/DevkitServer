@@ -15,9 +15,9 @@ using System.Reflection;
 using System.Reflection.Emit;
 using DanielWillett.ReflectionTools.Emit;
 using DanielWillett.ReflectionTools.Formatting;
+using DanielWillett.UITools.Util;
 using Version = System.Version;
 #if CLIENT
-using DevkitServer.API.UI;
 using DevkitServer.API.Multiplayer;
 using DevkitServer.Multiplayer.Cryptography;
 using DevkitServer.Multiplayer.Levels;
@@ -56,7 +56,12 @@ internal static class PatchesMain
         path = Path.Combine(path, "harmony.log");
         HarmonyLog.ResetConditional(path, enableDebug: true);
 
+#if CLIENT
+        UIAccessor.HarmonyId = HarmonyId;
+        Patcher = UIAccessor.Patcher;
+#else
         Patcher = new Harmony(HarmonyId);
+#endif
     }
     internal static void Init()
     {
@@ -1133,7 +1138,7 @@ internal static class PatchesMain
         if (levelDownload == null)
             return true;
 
-        UIAccessTools.SetLoadingCancelVisibility(false);
+        DevkitServerUITools.SetLoadingCancelVisibility(false);
 
         UniTask.Create(async () =>
         {

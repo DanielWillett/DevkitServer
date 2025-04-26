@@ -1,6 +1,7 @@
 using DanielWillett.ReflectionTools;
 using DanielWillett.SpeedBytes;
 using DanielWillett.SpeedBytes.Unity;
+using DanielWillett.UITools.Util;
 using DevkitServer.API;
 using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Patches;
@@ -17,7 +18,6 @@ using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
 #endif
 #if CLIENT
-using DevkitServer.API.UI;
 #endif
 
 namespace DevkitServer.Multiplayer.Actions;
@@ -1240,9 +1240,9 @@ public sealed class TileModifyAction : IAction, ICoordinatesAction
 public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinatesAction
 {
 #if CLIENT
-    private static readonly Func<Array?>? GetUILayers = UIAccessTools.CreateUIFieldGetterReturn<Array>(UIAccessTools.EditorTerrainTilesUIType, "layers", false);
-    private static readonly Func<int>? GetSelectedLayer = UIAccessTools.CreateUIFieldGetterReturn<int>(UIAccessTools.EditorTerrainTilesUIType, "selectedLayerIndex", false);
-    private static readonly Action<int>? SetSelectedLayerIndex = UIAccessTools.GenerateUICaller<Action<int>>(UIAccessTools.EditorTerrainTilesUIType, "SetSelectedLayerIndex", throwOnFailure: false);
+    private static readonly Func<Array?>? GetUILayers = DevkitServerUITools.CreateUIFieldGetterReturn<Array>(UIAccessor.EditorTerrainTilesUIType, "layers", false);
+    private static readonly Func<int>? GetSelectedLayer = DevkitServerUITools.CreateUIFieldGetterReturn<int>(UIAccessor.EditorTerrainTilesUIType, "selectedLayerIndex", false);
+    private static readonly Action<int>? SetSelectedLayerIndex = DevkitServerUITools.GenerateUICaller<Action<int>>(UIAccessor.EditorTerrainTilesUIType, "SetSelectedLayerIndex", throwOnFailure: false);
     private static readonly Action<object>? CallUpdateSelectedTile =
         Accessor.GenerateInstanceCaller<Action<object>>(
             AccessorExtensions.AssemblyCSharp

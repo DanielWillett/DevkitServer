@@ -1,4 +1,4 @@
-﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools;
 using DanielWillett.ReflectionTools.Emit;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
@@ -10,10 +10,10 @@ using HarmonyLib;
 using Pathfinding;
 using System.Reflection;
 using System.Reflection.Emit;
+using DanielWillett.UITools;
 using Progress = Pathfinding.Progress;
 #if CLIENT
 using DevkitServer.API;
-using DevkitServer.API.UI.Extensions;
 using DevkitServer.Core.UI.Extensions;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Sync;
@@ -322,7 +322,7 @@ internal static class NavigationPatches
         else
             Logger.DevkitServer.LogInfo(Source, $"[SERVER / A* PATHFINDING] [{netId.Format()}] {progress.Format("P")} - {desc.Colorize(ConsoleColor.Gray)}.");
 
-        EditorUIExtension? editorUi = UIExtensionManager.GetInstance<EditorUIExtension>();
+        EditorUIExtension? editorUi = UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorUIExtension>();
         if (editorUi != null)
         {
             if (!string.IsNullOrEmpty(desc))

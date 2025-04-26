@@ -1,7 +1,8 @@
-﻿#if CLIENT
+#if CLIENT
 using DanielWillett.ReflectionTools;
-using DevkitServer.API.UI.Extensions;
-using DevkitServer.API.UI.Extensions.Members;
+using DanielWillett.UITools;
+using DanielWillett.UITools.API.Extensions;
+using DanielWillett.UITools.API.Extensions.Members;
 using DevkitServer.API.UI.Icons;
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Movement;
@@ -222,7 +223,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
     {
         if (levelObject == null && buildable == null)
             ObjectIconPresets.ClearEditCache();
-        EditorLevelObjectsUIExtension? inst = UIExtensionManager.GetInstance<EditorLevelObjectsUIExtension>();
+        EditorLevelObjectsUIExtension? inst = UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorLevelObjectsUIExtension>();
         if (inst == null)
             return;
         try
@@ -324,7 +325,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
     }
     internal static void OnUpdate()
     {
-        EditorLevelObjectsUIExtension? inst = UIExtensionManager.GetInstance<EditorLevelObjectsUIExtension>();
+        EditorLevelObjectsUIExtension? inst = UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorLevelObjectsUIExtension>();
         if (inst == null)
             return;
 
@@ -515,7 +516,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         if (!__runOriginal || !DevkitServerConfig.Config.EnableObjectUIExtension)
             return;
 
-        EditorLevelObjectsUIExtension? inst = UIExtensionManager.GetInstance<EditorLevelObjectsUIExtension>();
+        EditorLevelObjectsUIExtension? inst = UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorLevelObjectsUIExtension>();
 
         if (inst == null)
             return;

@@ -18,7 +18,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <DisableImplicitFrameworkReferences>false</DisableImplicitFrameworkReferences>
-    <Version>0.0.41</Version>
+    <Version>0.0.42</Version>
     <Authors>DanielWillett</Authors>
     <Company>DanielWillett</Company>
     <Description>Module for Unturned that enables multi-user map editing.</Description>
@@ -83,6 +83,8 @@
     <Compile Remove="packages\**" />
     <Compile Remove="TestPlugin\**" />
     <Compile Remove="Common.targets" />
+		<Compile Remove="obj\**" />
+		<Compile Remove="bin\**" />
     <EmbeddedResource Remove="DevkitServer.Launcher\**" />
     <EmbeddedResource Remove="DevkitServer.Resources\**" />
     <EmbeddedResource Remove="DevkitServer.Tests\**" />
@@ -92,6 +94,8 @@
     <EmbeddedResource Remove="packages\**" />
     <EmbeddedResource Remove="TestPlugin\**" />
     <EmbeddedResource Remove="Common.targets" />
+		<EmbeddedResource Remove="obj\**" />
+		<EmbeddedResource Remove="bin\**" />
     <None Remove="DevkitServer.Launcher\**" />
     <None Remove="DevkitServer.Resources\**" />
     <None Remove="DevkitServer.Tests\**" />
@@ -101,16 +105,14 @@
     <None Remove="TestPlugin\**" />
     <None Remove="Common.targets" />
     <None Remove="Unturned.targets" />
+    <None Remove="obj\**" />
+    <None Remove="bin\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="DanielWillett.UnturnedUITools" Version="1.4.3" />
+    <PackageReference Include="DanielWillett.UnturnedUITools" Version="[1.4.3,2.0)" />
     <PackageReference Include="DanielWillett.LevelObjectIcons" Version="1.1.1" />
     <PackageReference Include="Microsoft.Bcl.HashCode" Version="[1.1.1,)" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Module\Bin\" />
-    <Folder Include="Multiplayer\HighSpeed\" />
-  </ItemGroup>
 </Project>

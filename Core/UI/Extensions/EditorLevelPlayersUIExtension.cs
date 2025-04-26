@@ -1,9 +1,10 @@
-﻿#if CLIENT
+#if CLIENT
+using DanielWillett.UITools.API.Extensions;
+using DanielWillett.UITools.API.Extensions.Members;
 using DevkitServer.API.Devkit.Spawns;
-using DevkitServer.API.UI.Extensions;
-using DevkitServer.API.UI.Extensions.Members;
 
 namespace DevkitServer.Core.UI.Extensions;
+
 [UIExtension(typeof(EditorLevelPlayersUI))]
 internal class EditorLevelPlayersUIExtension : BaseEditorSpawnsUIExtension<PlayerSpawnpoint>
 {

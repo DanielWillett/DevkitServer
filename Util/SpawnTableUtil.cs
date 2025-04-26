@@ -1,4 +1,5 @@
-﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools;
+using DanielWillett.UITools;
 using DevkitServer.API;
 using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.API.Permissions;
@@ -2953,7 +2954,7 @@ public static class SpawnTableUtil
                 animalTable.name = newName;
 #if CLIENT
                 if (Level.isEditor)
-                    UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateTableName(index, updateField);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateTableName(index, updateField);
 #endif
 
                 EventOnAnimalSpawnTableNameUpdated.TryInvoke(animalTable, index);
@@ -2964,7 +2965,7 @@ public static class SpawnTableUtil
                 vehicleTable.name = newName;
 #if CLIENT
                 if (Level.isEditor)
-                    UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateTableName(index, updateField);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateTableName(index, updateField);
 #endif
 
                 EventOnVehicleSpawnTableNameUpdated.TryInvoke(vehicleTable, index);
@@ -2975,7 +2976,7 @@ public static class SpawnTableUtil
                 itemTable.name = newName;
 #if CLIENT
                 if (Level.isEditor)
-                    UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateTableName(index, updateField);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateTableName(index, updateField);
 #endif
 
                 EventOnItemSpawnTableNameUpdated.TryInvoke(itemTable, index);
@@ -2986,7 +2987,7 @@ public static class SpawnTableUtil
                 zombieTable.name = newName;
 #if CLIENT
                 if (Level.isEditor)
-                    UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateTableName(index, updateField);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateTableName(index, updateField);
 #endif
 
                 EventOnZombieSpawnTableNameUpdated.TryInvoke(zombieTable, index);
@@ -3079,7 +3080,7 @@ public static class SpawnTableUtil
                 }
 #if CLIENT
                 if (Level.isEditor && EditorSpawns.selectedAnimal == index)
-                    UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateTableColor();
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateTableColor();
 #endif
 
                 EventOnAnimalSpawnTableColorUpdated.TryInvoke(animalTable, index);
@@ -3099,7 +3100,7 @@ public static class SpawnTableUtil
                 }
 #if CLIENT
                 if (Level.isEditor && EditorSpawns.selectedVehicle == index)
-                    UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateTableColor();
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateTableColor();
 #endif
 
                 EventOnVehicleSpawnTableColorUpdated.TryInvoke(vehicleTable, index);
@@ -3119,7 +3120,7 @@ public static class SpawnTableUtil
                 }
 #if CLIENT
                 if (Level.isEditor && EditorSpawns.selectedItem == index)
-                    UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateTableColor();
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateTableColor();
 #endif
 
                 EventOnItemSpawnTableColorUpdated.TryInvoke(itemTable, index);
@@ -3139,7 +3140,7 @@ public static class SpawnTableUtil
                 }
 #if CLIENT
                 if (Level.isEditor && EditorSpawns.selectedZombie == index)
-                    UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateTableColor();
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateTableColor();
 #endif
 
                 EventOnZombieSpawnTableColorUpdated.TryInvoke(zombieTable, index);
@@ -3356,7 +3357,7 @@ public static class SpawnTableUtil
                 animalTable.tableID = id;
 #if CLIENT
                 if (Level.isEditor && IsTableSelected(spawnType, index))
-                    UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateTableId();
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateTableId();
 #endif
 
                 EventOnAnimalSpawnTableSpawnAssetUpdated.TryInvoke(animalTable, index);
@@ -3367,7 +3368,7 @@ public static class SpawnTableUtil
                 vehicleTable.tableID = id;
 #if CLIENT
                 if (Level.isEditor && IsTableSelected(spawnType, index))
-                    UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateTableId();
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateTableId();
 #endif
 
                 EventOnVehicleSpawnTableSpawnAssetUpdated.TryInvoke(vehicleTable, index);
@@ -3378,7 +3379,7 @@ public static class SpawnTableUtil
                 itemTable.tableID = id;
 #if CLIENT
                 if (Level.isEditor && IsTableSelected(spawnType, index))
-                    UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateTableId();
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateTableId();
 #endif
 
                 EventOnItemSpawnTableSpawnAssetUpdated.TryInvoke(itemTable, index);
@@ -3389,7 +3390,7 @@ public static class SpawnTableUtil
                 zombieTable.lootID = id;
 #if CLIENT
                 if (Level.isEditor && IsTableSelected(spawnType, index))
-                    UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateLootId();
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateLootId();
 #endif
 
                 EventOnZombieSpawnTableSpawnAssetUpdated.TryInvoke(zombieTable, index);
@@ -3431,7 +3432,7 @@ public static class SpawnTableUtil
         zombieTable.isMega = isMega;
 #if CLIENT
         if (Level.isEditor && EditorSpawns.selectedZombie == index)
-            UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateIsMega();
+            UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateIsMega();
 #endif
 
         Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set zombie spawn table (# {index.Format()}) isMega to {isMega.Format()}.");
@@ -3468,7 +3469,7 @@ public static class SpawnTableUtil
         zombieTable.health = health;
 #if CLIENT
         if (Level.isEditor && EditorSpawns.selectedZombie == index)
-            UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateHealth();
+            UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateHealth();
 #endif
 
         Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set zombie spawn table (# {index.Format()}) health to {health.Format()}.");
@@ -3505,7 +3506,7 @@ public static class SpawnTableUtil
         zombieTable.damage = damage;
 #if CLIENT
         if (Level.isEditor && EditorSpawns.selectedZombie == index)
-            UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateDamage();
+            UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateDamage();
 #endif
 
         Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set zombie spawn table (# {index.Format()}) damage to {damage.Format()}.");
@@ -3558,7 +3559,7 @@ public static class SpawnTableUtil
         zombieTable.lootIndex = lootIndex;
 #if CLIENT
         if (Level.isEditor && EditorSpawns.selectedZombie == index)
-            UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateLootIndex();
+            UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateLootIndex();
 #endif
 
         Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set zombie spawn table (# {index.Format()}) loot index to {lootIndex.Format()} ({
@@ -3599,7 +3600,7 @@ public static class SpawnTableUtil
         zombieTable.xp = xp;
 #if CLIENT
         if (Level.isEditor && EditorSpawns.selectedZombie == index)
-            UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateXP();
+            UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateXP();
 #endif
 
         Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set zombie spawn table (# {index.Format()}) XP to {xp.Format()}.");
@@ -3636,7 +3637,7 @@ public static class SpawnTableUtil
         zombieTable.regen = regen;
 #if CLIENT
         if (Level.isEditor && EditorSpawns.selectedZombie == index)
-            UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateRegen();
+            UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateRegen();
 #endif
 
         Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set zombie spawn table (# {index.Format()}) regen to {regen.Format()}.");
@@ -3674,7 +3675,7 @@ public static class SpawnTableUtil
         zombieTable.ResetCachedZombieDifficultyAsset();
 #if CLIENT
         if (Level.isEditor && EditorSpawns.selectedZombie == index)
-            UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateDifficultyAsset();
+            UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateDifficultyAsset();
 #endif
 
         Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set zombie spawn table (# {index.Format()}) difficulty asset to {difficultyAsset.Format()}.");
@@ -3719,7 +3720,7 @@ public static class SpawnTableUtil
                 animalTier.name = newName;
 #if CLIENT
                 if (Level.isEditor && IsTableSelected(identifier.Type, identifier.TableIndex))
-                    UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateTierName(identifier.TierIndex);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateTierName(identifier.TierIndex);
 #endif
 
                 EventOnAnimalSpawnTierNameUpdated.TryInvoke(animalTier, identifier, HierarchicalEventSource.ThisObject);
@@ -3730,7 +3731,7 @@ public static class SpawnTableUtil
                 vehicleTier.name = newName;
 #if CLIENT
                 if (Level.isEditor && IsTableSelected(identifier.Type, identifier.TableIndex))
-                    UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateTierName(identifier.TierIndex);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateTierName(identifier.TierIndex);
 #endif
 
                 EventOnVehicleSpawnTierNameUpdated.TryInvoke(vehicleTier, identifier, HierarchicalEventSource.ThisObject);
@@ -3741,7 +3742,7 @@ public static class SpawnTableUtil
                 itemTier.name = newName;
 #if CLIENT
                 if (Level.isEditor && IsTableSelected(identifier.Type, identifier.TableIndex))
-                    UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateTierName(identifier.TierIndex);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateTierName(identifier.TierIndex);
 #endif
 
                 EventOnItemSpawnTierNameUpdated.TryInvoke(itemTier, identifier, HierarchicalEventSource.ThisObject);
@@ -3787,7 +3788,7 @@ public static class SpawnTableUtil
                 animalTier.chance = chance;
 #if CLIENT
                 if (Level.isEditor && IsTableSelected(identifier.Type, identifier.TableIndex))
-                    UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateTierChance(identifier.TierIndex, updateSlider);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateTierChance(identifier.TierIndex, updateSlider);
 #endif
 
                 EventOnAnimalSpawnTierChanceUpdated.TryInvoke(animalTier, identifier, HierarchicalEventSource.ThisObject);
@@ -3798,7 +3799,7 @@ public static class SpawnTableUtil
                 vehicleTier.chance = chance;
 #if CLIENT
                 if (Level.isEditor && IsTableSelected(identifier.Type, identifier.TableIndex))
-                    UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateTierChance(identifier.TierIndex, updateSlider);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateTierChance(identifier.TierIndex, updateSlider);
 #endif
 
                 EventOnVehicleSpawnTierChanceUpdated.TryInvoke(vehicleTier, identifier, HierarchicalEventSource.ThisObject);
@@ -3809,7 +3810,7 @@ public static class SpawnTableUtil
                 itemTier.chance = chance;
 #if CLIENT
                 if (Level.isEditor && IsTableSelected(identifier.Type, identifier.TableIndex))
-                    UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateTierChance(identifier.TierIndex, updateSlider);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateTierChance(identifier.TierIndex, updateSlider);
 #endif
 
                 EventOnItemSpawnTierChanceUpdated.TryInvoke(itemTier, identifier, HierarchicalEventSource.ThisObject);
@@ -3820,7 +3821,7 @@ public static class SpawnTableUtil
                 zombieTier.chance = chance;
 #if CLIENT
                 if (Level.isEditor && IsTableSelected(identifier.Type, identifier.TableIndex))
-                    UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateSlotChance(identifier.TierIndex, updateSlider);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateSlotChance(identifier.TierIndex, updateSlider);
 #endif
 
                 EventOnZombieSpawnTierChanceUpdated.TryInvoke(zombieTier, identifier, HierarchicalEventSource.ThisObject);
@@ -3932,7 +3933,7 @@ public static class SpawnTableUtil
                     TryGetSelectedTier(SpawnType.Animal, out SpawnTierIdentifier? selectedTier) &&
                     selectedTier.HasValue && selectedTier.Value.TierIndex == tierIndex)
                 {
-                    UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateSpawnName(assetIndex);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateSpawnName(assetIndex);
                 }
 #endif
 
@@ -3949,7 +3950,7 @@ public static class SpawnTableUtil
                     TryGetSelectedTier(SpawnType.Vehicle, out selectedTier) &&
                     selectedTier.HasValue && selectedTier.Value.TierIndex == tierIndex)
                 {
-                    UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateSpawnName(assetIndex);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateSpawnName(assetIndex);
                 }
 #endif
 
@@ -3966,7 +3967,7 @@ public static class SpawnTableUtil
                     TryGetSelectedTier(SpawnType.Item, out selectedTier) &&
                     selectedTier.HasValue && selectedTier.Value.TierIndex == tierIndex)
                 {
-                    UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateSpawnName(assetIndex);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateSpawnName(assetIndex);
                 }
 #endif
 
@@ -3983,7 +3984,7 @@ public static class SpawnTableUtil
                     TryGetSelectedTier(SpawnType.Zombie, out selectedTier) &&
                     selectedTier.HasValue && selectedTier.Value.TierIndex == tierIndex)
                 {
-                    UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateSpawnName(assetIndex);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateSpawnName(assetIndex);
                 }
 #endif
 

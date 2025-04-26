@@ -1,11 +1,11 @@
-﻿#if CLIENT
+#if CLIENT
 using Cysharp.Threading.Tasks;
+using DanielWillett.UITools;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Devkit;
 using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.API.Iterators;
 using DevkitServer.API.UI;
-using DevkitServer.API.UI.Extensions;
 using DevkitServer.Core.UI.Extensions;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Actions;
@@ -616,16 +616,16 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
             switch (spawnpointNode)
             {
                 case AnimalSpawnpointNode a:
-                    UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateLabel(a.Spawnpoint);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateLabel(a.Spawnpoint);
                     break;
                 case ItemSpawnpointNode i:
-                    UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateLabel(i.Spawnpoint);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateLabel(i.Spawnpoint);
                     break;
                 case ZombieSpawnpointNode z:
-                    UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateLabel(z.Spawnpoint);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateLabel(z.Spawnpoint);
                     break;
                 case VehicleSpawnpointNode v:
-                    UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateLabel(v.Spawnpoint);
+                    UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateLabel(v.Spawnpoint);
                     break;
             }
         }

@@ -1,4 +1,4 @@
-﻿using DanielWillett.SpeedBytes;
+using DanielWillett.SpeedBytes;
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
@@ -7,7 +7,7 @@ using DevkitServer.Util.Encoding;
 using SDG.NetPak;
 using System.Globalization;
 #if CLIENT
-using DevkitServer.API.UI.Extensions;
+using DanielWillett.UITools;
 using DevkitServer.Core.UI.Extensions;
 #endif
 
@@ -191,7 +191,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
 #if CLIENT
         if (_pendingUINetId == _pendingNetId)
         {
-            EditorUIExtension? uiExt = UIExtensionManager.GetInstance<EditorUIExtension>();
+            EditorUIExtension? uiExt = UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorUIExtension>();
             if (uiExt != null)
             {
                 uiExt.UpdateLoadingBarProgress((float)(_packetId + 1) / _ttlPackets);
@@ -426,7 +426,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
 #if CLIENT
             if (_pendingUINetId == netId)
             {
-                EditorUIExtension? uiExt = UIExtensionManager.GetInstance<EditorUIExtension>();
+                EditorUIExtension? uiExt = UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorUIExtension>();
                 if (uiExt != null)
                 {
                     uiExt.UpdateLoadingBarProgress(1f);
@@ -460,14 +460,14 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
         {
             if (time - _pendingUINetIdStartTime > 7.5f)
             {
-                EditorUIExtension? uiExt = UIExtensionManager.GetInstance<EditorUIExtension>();
+                EditorUIExtension? uiExt = UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorUIExtension>();
                 uiExt?.UpdateLoadingBarVisibility(false);
                 _pendingUINetId = NetId.INVALID;
                 _timingOutNetId = NetId.INVALID;
             }
             else if (time - _pendingUINetIdStartTime > 5f && _timingOutNetId != _pendingUINetId)
             {
-                EditorUIExtension? uiExt = UIExtensionManager.GetInstance<EditorUIExtension>();
+                EditorUIExtension? uiExt = UnturnedUIToolsNexus.UIExtensionManager.GetInstance<EditorUIExtension>();
                 uiExt?.UpdateLoadingBarProgress(0f);
                 uiExt?.UpdateLoadingBarDescription("Timed Out.");
                 _timingOutNetId = _pendingUINetId;

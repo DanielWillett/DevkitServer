@@ -164,11 +164,20 @@ internal class DevkitServerResources
         new DevkitServerFileResource("DanielWillett.SpeedBytes.LICENSE",
             Lib("DanielWillett.SpeedBytes", "LICENSE.txt"), new Version(0, 0, 29, 0)),
 
+        new DevkitServerFileResource("UnturnedUITools",
+            Lib("UnturnedUITools", "UnturnedUITools.dll"), new Version(0, 0, 43, 0)) { Side = Side.Client },
+        new DevkitServerFileResource("UnturnedUITools.XmlDocs",
+            Lib("UnturnedUITools", "UnturnedUITools.xml"), new Version(0, 0, 43, 0)) { Side = Side.Client },
+        new DevkitServerFileResource("UnturnedUITools.Symbols",
+            Lib("UnturnedUITools", "UnturnedUITools.pdb"), new Version(0, 0, 43, 0)) { Side = Side.Client },
+        new DevkitServerFileResource("UnturnedUITools.LICENSE",
+            Lib("UnturnedUITools", "LICENSE.txt"), new Version(0, 0, 43, 0)) { Side = Side.Client },
+
         // legacy reflection tools forwarding
         new DevkitServerFileResource("FWD.DanielWillett.ReflectionTools",
             LibFwd("DanielWillett.ReflectionTools.dll"), new Version(0, 0, 29, 0)) { Delete = true },
         new DevkitServerFileResource("FWD.DanielWillett.UnturnedUITools",
-            LibFwd("DanielWillett.UnturnedUITools.dll"), new Version(0, 0, 39, 0)) { Side = Side.Client },
+            LibFwd("DanielWillett.UnturnedUITools.dll"), new Version(0, 0, 43, 0)) { Delete = true },
         new DevkitServerFileResource("FWD.DanielWillett.LevelObjectIcons",
             LibFwd("DanielWillett.LevelObjectIcons.dll"), new Version(0, 0, 24, 0)) { Side = Side.Client },
 

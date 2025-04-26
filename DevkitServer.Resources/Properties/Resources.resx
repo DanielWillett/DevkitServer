@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- ReSharper disable ResxNotResolved -->
   <!-- 
@@ -164,8 +164,17 @@
   <data name="DanielWillett.SpeedBytes.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\DanielWillett.SpeedBytes\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="FWD.DanielWillett.UnturnedUITools" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\ForwardingTargets\DanielWillett.UnturnedUITools.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  <data name="UnturnedUITools" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\UnturnedUITools\UnturnedUITools.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="UnturnedUITools.XmlDocs" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\UnturnedUITools\UnturnedUITools.xml;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="UnturnedUITools.Symbols" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\UnturnedUITools\UnturnedUITools.pdb;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="UnturnedUITools.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\UnturnedUITools\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="FWD.DanielWillett.LevelObjectIcons" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\ForwardingTargets\DanielWillett.LevelObjectIcons.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>

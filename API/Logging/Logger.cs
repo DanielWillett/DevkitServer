@@ -1,3 +1,4 @@
+using DanielWillett.ReflectionTools;
 using DevkitServer.Configuration;
 using DevkitServer.Core.Logging;
 using DevkitServer.Core.Logging.Loggers;
@@ -18,6 +19,7 @@ public static class Logger
     internal static bool Debug => !_hasDsInited || DevkitServerConfig.Config.DebugLogging;
     static Logger()
     {
+        Accessor.Logger = new DevkitServerReflectionToolsLogger();
         StackCleaner = StackTraceCleaner.Default;
         Terminal = DevkitServerModule.UnturnedLoaded ? new BackgroundLoggingTerminal() : new ExternalLoggingTerminal();
     }
@@ -287,6 +289,41 @@ public static class Logger
                     fileWriter.WriteLine(FormattingUtil.RemoveVirtualTerminalSequences(Logs[i]));
                 }
             }
+        }
+    }
+}
+
+internal class DevkitServerReflectionToolsLogger : IReflectionToolsLogger
+{
+    private readonly CoreLogger _logger = new CoreLogger("REFLECTION TOOLS");
+    /// <inheritdoc />
+    public void LogDebug(string source, string message)
+    {
+        _logger.LogDebug(source, message);
+    }
+
+    /// <inheritdoc />
+    public void LogInfo(string source, string message)
+    {
+        _logger.LogInfo(source, message);
+    }
+
+    /// <inheritdoc />
+    public void LogWarning(string source, string message)
+    {
+        _logger.LogWarning(source, message);
+    }
+
+    /// <inheritdoc />
+    public void LogError(string source, Exception? ex, string? message)
+    {
+        if (ex != null)
+        {
+            _logger.LogError(source, ex, message);
+        }
+        else
+        {
+            _logger.LogError(source, message);
         }
     }
 }

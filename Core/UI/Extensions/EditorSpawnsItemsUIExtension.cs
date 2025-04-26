@@ -1,7 +1,7 @@
-﻿#if CLIENT
+#if CLIENT
+using DanielWillett.UITools.API.Extensions;
+using DanielWillett.UITools.API.Extensions.Members;
 using DevkitServer.API.Devkit.Spawns;
-using DevkitServer.API.UI.Extensions;
-using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.Models;
 using DevkitServer.Util.Region;
 
@@ -14,13 +14,13 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtensionNormalT
 
     // base properties wont patch right because generics share patches.
 
-    [ExistingMember("itemButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("itemButtons", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected ISleekButton[]? Assets2 { get; }
 
-    [ExistingMember("tableButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("tableButtons", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected ISleekButton[]? Tables2 { get; }
 
-    [ExistingMember("tierButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    [ExistingMember("tierButtons", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected ISleekButton[]? Tiers2 { get; }
     protected override ISleekButton[]? Assets => Assets2;
     protected override ISleekButton[]? Tables => Tables2;
