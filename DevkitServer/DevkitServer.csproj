@@ -1,0 +1,138 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+
+		<Version>0.1.0</Version>
+
+  </PropertyGroup>
+
+	<PropertyGroup>
+
+		<TargetFramework>netstandard2.1</TargetFramework>
+		<Nullable>enable</Nullable>
+		<LangVersion>13.0</LangVersion>
+
+		<PackageId>DevkitServer</PackageId>
+
+		<Authors>DanielWillett</Authors>
+		<Description>Multiplayer editor module for Unturned.</Description>
+
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<EnablePreviewFeatures>true</EnablePreviewFeatures>
+		<DoNotCopyLocalIfInGac>true</DoNotCopyLocalIfInGac>
+
+		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+		<PackageIcon>icon.png</PackageIcon>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+
+		<RepositoryUrl>https://github.com/DanielWillett/DevkitServer.git</RepositoryUrl>
+
+		<PackageTags>Unturned;Map Editor;Devkit;Multiplayer;Modding</PackageTags>
+		<NeutralLanguage>en-US</NeutralLanguage>
+		<RootNamespace>DevkitServer</RootNamespace>
+		<AssemblyVersion>$(Version).0</AssemblyVersion>
+		<FileVersion>$(Version).0</FileVersion>
+		<MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB3030</MSBuildWarningsAsMessages>
+		<DefineConstants>$(DefineConstants);JETBRAINS_ANNOTATIONS</DefineConstants>
+
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+
+		<IncludeSymbols>true</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+
+		<Title>DevkitServer</Title>
+		<IsPublishable>False</IsPublishable>
+		<NoWin32Manifest>true</NoWin32Manifest>
+
+	</PropertyGroup>
+
+	<!-- Build to module dir if it exists -->
+	<PropertyGroup Condition="'$(CopyToModule)' != 'False' And exists('$(ServerPath)\Modules\DevkitServer\Bin')">
+		<OutDir>$(ServerPath)\Modules\Uncreated.Warfare\Bin</OutDir>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(CopyToModule)' == 'False'">
+		<TargetFramework>net8.0</TargetFramework>
+	</PropertyGroup>
+
+	<ItemDefinitionGroup Condition="'$(CopyToModule)' != 'False'">
+		<PackageReference ExcludeAssets="runtime" />
+	</ItemDefinitionGroup>
+
+	<ItemDefinitionGroup Condition="'$(CopyToModule)' != 'False'">
+		<Reference Private="false" />
+	</ItemDefinitionGroup>
+
+	<ItemGroup>
+
+		<None Include="..\icon.png" Pack="true" PackagePath="\" />
+		<None Include="..\README.md" Pack="true" PackagePath="\" />
+		<None Include="..\LICENSE.md" Pack="true" PackagePath="\" />
+
+	</ItemGroup>
+
+	<!-- Unturned Files -->
+  <Choose>
+   <When Condition="exists('$(ServerPath)/Unturned_Data/Managed/Assembly-CSharp.dll')">
+    <PropertyGroup>
+     <UnturnedDllPath>$(ServerPath)/Unturned_Data/Managed</UnturnedDllPath>
+    </PropertyGroup>
+   </When>
+   <Otherwise>
+    <PropertyGroup>
+     <UnturnedDllPath>../Libraries</UnturnedDllPath>
+    </PropertyGroup>
+   </Otherwise>
+  </Choose>
+
+  <ItemGroup>
+
+	  <!-- Third Party -->
+	  <Reference Include="UniTask">
+		  <HintPath>../Libraries/UniTask.dll</HintPath>
+		  <Private>!$(CopyToModule)</Private>
+	  </Reference>
+
+  </ItemGroup>
+
+	<!-- Unturned Files -->
+	<ItemGroup>
+
+		<UnturnedLibrary Include="Assembly-CSharp" />
+		<UnturnedLibrary Include="SDG.NetTransport" />
+		<UnturnedLibrary Include="Unity.TextMeshPro" />
+		<UnturnedLibrary Include="SDG.NetPak.Runtime" />
+		<UnturnedLibrary Include="UnturnedDat" />
+		<UnturnedLibrary Include="UnityEx" />
+		<UnturnedLibrary Include="com.rlabrecque.steamworks.net" />
+		<UnturnedLibrary Include="UnityEngine" />
+		<UnturnedLibrary Include="UnityEngine.CoreModule" />
+		<UnturnedLibrary Include="UnityEngine.UI" />
+		<UnturnedLibrary Include="UnityEngine.UIModule" />
+		<UnturnedLibrary Include="UnityEngine.PhysicsModule" />
+		<UnturnedLibrary Include="UnityEngine.ImageConversionModule" />
+		<UnturnedLibrary Include="UnityEngine.UnityWebRequestModule" />
+		<UnturnedLibrary Include="UnityEngine.AssetBundleModule" />
+
+	</ItemGroup>
+
+	<!-- Reference all unturned in ~/Libraries -->
+	<ItemGroup>
+		<Reference Include="@(UnturnedLibrary->'%(Identity)')" HintPath="$(UnturnedDllPath)\%(Identity).dll" Private="!$(CopyToModule)" />
+	</ItemGroup>
+
+  <!-- Copy unturned files from U3DS to ~/Libraries -->
+  <Target Name="PreBuild" BeforeTargets="PreBuildEvent" Condition="exists('$(ServerPath)/Unturned_Data/Managed/Assembly-CSharp.dll')">
+	  <Copy SourceFiles="$(UnturnedDllPath)/%(UnturnedLibrary.Identity).dll" DestinationFolder="..\Libraries" />
+	  <Copy SourceFiles="$(UnturnedDllPath)/%(UnturnedLibrary.Identity).xml" DestinationFolder="..\Libraries" ContinueOnError="true" />
+  </Target>
+  <!-- Copy xml docs for unity files to U3DS -->
+  <Target Name="PreBuildXml2Unturned" BeforeTargets="PreBuildEvent" Condition="exists('$(ServerPath)/Unturned_Data/Managed/Assembly-CSharp.dll') And exists('C:\Program Files\Unity\Hub\Editor\2021.3.29f1\Editor\Data\Managed\UnityEngine')">
+	  <Copy SourceFiles="C:\Program Files\Unity\Hub\Editor\2021.3.29f1\Editor\Data\Managed\UnityEngine\%(UnturnedLibrary.Identity).xml" DestinationFolder="$(ServerPath)/Unturned_Data/Managed" ContinueOnError="true" />
+  </Target>
+  <!-- Copy xml docs for unity files to ~/Libraries -->
+  <Target Name="PreBuildXml2Libraries" BeforeTargets="PreBuildEvent" Condition="exists('C:\Program Files\Unity\Hub\Editor\2021.3.29f1\Editor\Data\Managed\UnityEngine')">
+	  <Copy SourceFiles="C:\Program Files\Unity\Hub\Editor\2021.3.29f1\Editor\Data\Managed\UnityEngine\%(UnturnedLibrary.Identity).xml" DestinationFolder="..\Libraries" ContinueOnError="true" />
+  </Target>
+
+</Project>
