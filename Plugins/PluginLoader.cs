@@ -660,10 +660,6 @@ public static class PluginLoader
         {
             cachedTranslationSourcePlugin.TranslationSource = TranslationSource.FromPlugin(plugin);
         }
-
-#if CLIENT
-        UnturnedUIToolsNexus.UIExtensionManager.RegisterFromModuleAssembly(plugin.Assembly.Assembly, GetMockModule(plugin));
-#endif
     }
 
     private static void DeinitPlugin(IDevkitServerPlugin plugin)

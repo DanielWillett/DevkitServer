@@ -108,7 +108,7 @@ public class CommandContext : Exception
         }
 #else
         InvokedFromConsole = console;
-        if (Player.player != null)
+        if (DevkitServerModule.UnityLoaded && Player.player != null)
         {
             IsConsole = false;
             Caller = Player.player?.channel.owner;

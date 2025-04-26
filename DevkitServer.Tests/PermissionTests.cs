@@ -1,12 +1,17 @@
-﻿using DanielWillett.SpeedBytes;
+using DanielWillett.SpeedBytes;
 using DevkitServer.API;
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Logging.Loggers;
 using DevkitServer.Plugins;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using DanielWillett.UITools;
+using DanielWillett.UITools.API.Extensions;
+using Module = SDG.Framework.Modules.Module;
 
 namespace DevkitServer.Tests;
 
@@ -26,6 +31,8 @@ public class PermissionTests
 
             TestHelpers.SetupMainThread();
             TestHelpers.SetupFormatProvider();
+
+            UnturnedUIToolsNexus.UIExtensionManager = new TestUIExtensionManager();
 
             PluginLoader.RegisterPlugin(new TestPlugin("a", "A"));
             PluginLoader.RegisterPlugin(new TestPlugin("plugin1", "Plugin1"));
@@ -315,4 +322,37 @@ public class PermissionTests
 
         public string Source => string.Empty;
     }
+}
+
+public class TestUIExtensionManager : IUIExtensionManager
+{
+    /// <inheritdoc />
+    public T? GetInstance<T>() where T : class => null;
+
+    /// <inheritdoc />
+    public T? GetInstance<T>(object vanillaUIInstance) where T : class => null;
+
+    /// <inheritdoc />
+    public void RegisterExtension(Type extensionType, Type parentType, Module module)
+    {
+
+    }
+
+    /// <inheritdoc />
+    public void RegisterFromModuleAssembly(Assembly assembly, Module module)
+    {
+
+    }
+
+    /// <inheritdoc />
+    public void Initialize()
+    {
+
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<UIExtensionInfo> Extensions => Array.Empty<UIExtensionInfo>();
+
+    /// <inheritdoc />
+    public bool DebugLogging { get; set; }
 }
