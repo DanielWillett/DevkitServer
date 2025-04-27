@@ -618,7 +618,7 @@ public sealed class DevkitServerModule : IModuleNexus
                 }
             }
 
-            UnturnedUIToolsNexus.UIExtensionManager = new DevkitServerUIExtensionManager { DebugLogging = true };
+            UnturnedUIToolsNexus.UIExtensionManager = new DevkitServerUIExtensionManager { DebugLogging = DevkitServerConfig.Config.DebugLogging };
             
             // includes this module
             UnturnedUIToolsNexus.Initialize();
