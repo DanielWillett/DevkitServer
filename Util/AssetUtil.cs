@@ -1,8 +1,9 @@
-﻿using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using DanielWillett.ReflectionTools;
 using DanielWillett.ReflectionTools.Emit;
 using DevkitServer.API;
 using SDG.Framework.Modules;
+using SDG.Framework.Utilities;
 using System.Reflection;
 using System.Reflection.Emit;
 using Module = SDG.Framework.Modules.Module;
@@ -17,7 +18,7 @@ public static class AssetUtil
     private const string Source = "ASSET UTIL";
 
     private static readonly DatParser Parser = new DatParser();
-    private static readonly Action<string, AssetOrigin>? LoadFile;
+    private static readonly Action<string, AssetOrigin, List<string>>? LoadFile;
     private static readonly Action<AssetOrigin>? SyncAssetsFromOriginMethod;
     private static readonly Action<MasterBundleConfig, byte[]>? SetHash;
     private static readonly Action<MasterBundleConfig, AssetBundle>? SetAssetBundle;
@@ -147,14 +148,30 @@ public static class AssetUtil
             Logger.DevkitServer.LogWarning(nameof(LoadFileSync), $"Unable to load file from origin {origin.name.Format(false)}: {path.Format()}.");
             return;
         }
+        List<string> errors = ListPool<string>.claim();
         try
         {
-            LoadFile(path, origin);
-            Logger.DevkitServer.LogDebug(nameof(LoadFileSync), $"Loaded asset: {origin.GetAssets().FirstOrDefault(x => Path.GetFullPath(x.getFilePath()).Equals(path, StringComparison.Ordinal)).Format()}");
+            LoadFile(path, origin, errors);
+
+            if (errors.Count > 0)
+            {
+                foreach (string error in errors)
+                {
+                    Logger.DevkitServer.LogWarning(nameof(LoadFileSync), $"Error loading asset: {error.Format(true)}.");
+                }
+            }
+            else
+            {
+                Logger.DevkitServer.LogDebug(nameof(LoadFileSync), $"Loaded asset: {origin.GetAssets().LastOrDefault(x => Path.GetFullPath(x.getFilePath()).Equals(path, StringComparison.Ordinal)).Format()}");
+            }
         }
         catch (Exception ex)
         {
             Logger.DevkitServer.LogWarning(nameof(LoadFileSync), ex, $"Error loading asset from origin {origin.name.Format(false)}: {path.Format()}.");
+        }
+        finally
+        {
+            ListPool<string>.release(errors);
         }
     }
 
@@ -168,7 +185,7 @@ public static class AssetUtil
 
         if (!Assets.shouldLoadAnyAssets)
             return;
-        DatDictionary dict = ReadFileWithoutHash(masterBundleDatFilePath);
+        IDatDictionary dict = ReadFileWithoutHash(masterBundleDatFilePath);
         MasterBundleConfig config = new MasterBundleConfig(Path.GetDirectoryName(masterBundleDatFilePath), dict, origin);
         byte[] data;
         byte[] hash;
@@ -224,13 +241,17 @@ public static class AssetUtil
     /// <summary>
     /// Reads a <see cref="DatDictionary"/> from <paramref name="path"/> without hashing it.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     [Pure]
-    public static DatDictionary ReadFileWithoutHash(string path)
+    public static IDatDictionary ReadFileWithoutHash(string path)
     {
+        ThreadUtil.assertIsGameThread();
+
         using FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         using StreamReader inputReader = new StreamReader(fileStream);
         return Parser.Parse(inputReader);
     }
+
 
     /// <summary>
     /// Get internal reward array from an <see cref="NPCRewardsList"/>.
@@ -386,7 +407,9 @@ public static class AssetUtil
         if (apply)
             SyncAssetsFromOrigin(origin);
     }
-    private static void GetData(string filePath, out DatDictionary assetData, out string? assetError, out byte[] hash, out DatDictionary? translationData, out DatDictionary? fallbackTranslationData)
+
+
+    private static void GetData(string filePath, out IDatDictionary assetData, List<string>? assetErrors, out byte[] hash, out IDatDictionary? translationData, out IDatDictionary? fallbackTranslationData)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -396,7 +419,11 @@ public static class AssetUtil
         using StreamReader input = new StreamReader(sha1Fs);
 
         assetData = Parser.Parse(input);
-        assetError = Parser.ErrorMessage;
+        if (Parser.ErrorMessages is { Count: > 0 } && assetErrors != null)
+        {
+            assetErrors.AddRange(Parser.ErrorMessages);
+        }
+
         hash = sha1Fs.Hash;
         string localLang = Path.Combine(directoryName, Provider.language + ".dat");
         string englishLang = Path.Combine(directoryName, "English.dat");
@@ -426,39 +453,17 @@ public static class AssetUtil
                 return;
             }
 
-            MethodInfo method = typeof(AssetUtil).GetMethod(nameof(GetData), BindingFlags.Static | BindingFlags.NonPublic)!;
-            Type? assetInfo = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.AssetsWorker+AssetDefinition", false, false);
+            Type? assetInfo = typeof(Assets).Assembly.GetType("SDG.Unturned.AssetsWorker+AssetDefinition", false, false);
             if (assetInfo == null)
             {
-                Logger.DevkitServer.LogError(Source, "Type not found: AssetsWorker.AssetDefinition.");
+                Logger.DevkitServer.LogError(Source, "AssetsWorker.AssetDefinition not found.");
                 return;
             }
 
             MethodInfo? loadFileMethod = typeof(Assets).GetMethod("LoadFile", BindingFlags.NonPublic | BindingFlags.Static);
             if (loadFileMethod == null)
             {
-                Logger.DevkitServer.LogError(Source, "Method not found: Assets.LoadFile.");
-                return;
-            }
-
-            MethodInfo? setHash = typeof(MasterBundleConfig).GetProperty(nameof(MasterBundleConfig.hash), BindingFlags.Public | BindingFlags.Instance)?.GetSetMethod(true);
-            if (setHash == null)
-            {
-                Logger.DevkitServer.LogError(Source, "Method not found: set MasterBundleConfig.hash.");
-                return;
-            }
-
-            MethodInfo? setAssetBundle = typeof(MasterBundleConfig).GetProperty(nameof(MasterBundleConfig.assetBundle), BindingFlags.Public | BindingFlags.Instance)?.GetSetMethod(true);
-            if (setAssetBundle == null)
-            {
-                Logger.DevkitServer.LogError(Source, "Method not found: set MasterBundleConfig.assetBundle.");
-                return;
-            }
-
-            MethodInfo? checkOwnerCustomDataAndMaybeUnload = typeof(MasterBundleConfig).GetMethod("CheckOwnerCustomDataAndMaybeUnload", BindingFlags.NonPublic | BindingFlags.Instance);
-            if (checkOwnerCustomDataAndMaybeUnload == null)
-            {
-                Logger.DevkitServer.LogError(Source, "Method not found: MasterBundleConfig.CheckOwnerCustomDataAndMaybeUnload.");
+                Logger.DevkitServer.LogError(Source, "Assets.LoadFile not found.");
                 return;
             }
 
@@ -467,98 +472,99 @@ public static class AssetUtil
             FieldInfo? assetDataField = assetInfo.GetField("assetData", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             FieldInfo? translationDataField = assetInfo.GetField("translationData", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             FieldInfo? fallbackTranslationDataField = assetInfo.GetField("fallbackTranslationData", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            FieldInfo? assetErrorField = assetInfo.GetField("assetError", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            FieldInfo? assetErrorsField = assetInfo.GetField("assetErrors", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             FieldInfo? originField = assetInfo.GetField("origin", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (pathField == null || hashField == null || assetDataField == null || translationDataField == null || fallbackTranslationDataField == null || assetErrorField == null || originField == null)
+            if (pathField == null || hashField == null || assetDataField == null || translationDataField == null || fallbackTranslationDataField == null || assetErrorsField == null || originField == null)
             {
                 Logger.DevkitServer.LogError(Source, "Missing field in AssetsWorker.AssetDefinition.");
+                return;
             }
 
-            DynamicMethod dm = new DynamicMethod("LoadAsset", typeof(void), [ typeof(string), typeof(AssetOrigin) ], typeof(AssetUtil).Module, true);
-            IOpCodeEmitter generator = dm.GetILGenerator().AsEmitter();
-            dm.DefineParameter(0, ParameterAttributes.None, "path");
-            dm.DefineParameter(1, ParameterAttributes.None, "assetOrigin");
-            generator.DeclareLocal(typeof(DatDictionary));
+            DynamicMethodInfo<Action<string, AssetOrigin, List<string>>> dynMethod = DynamicMethodHelper.Create<Action<string, AssetOrigin, List<string>>>("LoadAsset", typeof(AssetUtil), initLocals: false);
 
-            generator.DeclareLocal(typeof(string));
-            generator.DeclareLocal(typeof(byte[]));
-            generator.DeclareLocal(typeof(DatDictionary));
-            generator.DeclareLocal(typeof(DatDictionary));
-            generator.DeclareLocal(assetInfo);
+#if DEBUG
+            IOpCodeEmitter emit = dynMethod.GetEmitter(debuggable: true);
+#else
+        IOpCodeEmitter emit = dynMethod.GetEmitter(debuggable: false);
+#endif
+            dynMethod.DefineParameter(0, ParameterAttributes.None, "path");
+            dynMethod.DefineParameter(1, ParameterAttributes.None, "assetOrigin");
 
-            generator.Emit(OpCodes.Ldarg_0);
-            generator.Emit(OpCodes.Ldloca_S, 0);
-            generator.Emit(OpCodes.Ldloca_S, 1);
-            generator.Emit(OpCodes.Ldloca_S, 2);
-            generator.Emit(OpCodes.Ldloca_S, 3);
-            generator.Emit(OpCodes.Ldloca_S, 4);
-            generator.Emit(method.GetCallRuntime(), method);
+            LocalBuilder lclData = emit.DeclareLocal(typeof(IDatDictionary));
 
-            if (pathField != null)
+            LocalBuilder lclHash = emit.DeclareLocal(typeof(byte[]));
+            LocalBuilder lclTranslationData = emit.DeclareLocal(typeof(IDatDictionary));
+            LocalBuilder lclFallbackTranslationData = emit.DeclareLocal(typeof(IDatDictionary));
+            LocalBuilder lclAssetInfo = emit.DeclareLocal(assetInfo);
+
+            emit.LoadArgument(0)
+                .LoadLocalAddress(lclData)
+                .LoadArgument(2)
+                .LoadLocalAddress(lclHash)
+                .LoadLocalAddress(lclTranslationData)
+                .LoadLocalAddress(lclFallbackTranslationData)
+                .Invoke(Accessor.GetMethod(GetData)!);
+
+            emit.LoadLocalAddress(lclAssetInfo)
+                .LoadArgument(0)
+                .SetInstanceFieldValue(pathField);
+
+            emit.LoadLocalAddress(lclAssetInfo)
+                .LoadLocalValue(lclHash)
+                .SetInstanceFieldValue(hashField);
+
+            emit.LoadLocalAddress(lclAssetInfo)
+                .LoadLocalValue(lclData)
+                .SetInstanceFieldValue(assetDataField);
+
+            emit.LoadLocalAddress(lclAssetInfo)
+                .LoadLocalValue(lclTranslationData)
+                .SetInstanceFieldValue(translationDataField);
+
+            emit.LoadLocalAddress(lclAssetInfo)
+                .LoadLocalValue(lclFallbackTranslationData)
+                .SetInstanceFieldValue(fallbackTranslationDataField);
+
+            emit.LoadLocalAddress(lclAssetInfo)
+                .LoadArgument(2)
+                .SetInstanceFieldValue(assetErrorsField);
+
+            emit.LoadLocalAddress(lclAssetInfo)
+                .LoadArgument(1)
+                .SetInstanceFieldValue(originField);
+
+            emit.LoadLocalValue(lclAssetInfo)
+                .Invoke(loadFileMethod)
+                .Return();
+
+            LoadFile = dynMethod.CreateDelegate();
+
+            MethodInfo? setHash = typeof(MasterBundleConfig).GetProperty(nameof(MasterBundleConfig.hash), BindingFlags.Public | BindingFlags.Instance)?.GetSetMethod(true);
+            if (setHash == null)
             {
-                generator.Emit(OpCodes.Ldloca_S, 5);
-                generator.Emit(OpCodes.Ldarg_0);
-                generator.Emit(OpCodes.Stfld, pathField);
+                Logger.DevkitServer.LogError(Source, "Method not found: set MasterBundleConfig.hash.");
             }
-
-            if (hashField != null)
-            {
-                generator.Emit(OpCodes.Ldloca_S, 5);
-                generator.Emit(OpCodes.Ldloc_2);
-                generator.Emit(OpCodes.Stfld, hashField);
-            }
-
-            if (assetDataField != null)
-            {
-                generator.Emit(OpCodes.Ldloca_S, 5);
-                generator.Emit(OpCodes.Ldloc_0);
-                generator.Emit(OpCodes.Stfld, assetDataField);
-            }
-
-            if (translationDataField != null)
-            {
-                generator.Emit(OpCodes.Ldloca_S, 5);
-                generator.Emit(OpCodes.Ldloc_3);
-                generator.Emit(OpCodes.Stfld, translationDataField);
-            }
-
-            if (fallbackTranslationDataField != null)
-            {
-                generator.Emit(OpCodes.Ldloca_S, 5);
-                generator.Emit(OpCodes.Ldloc_S, 4);
-                generator.Emit(OpCodes.Stfld, fallbackTranslationDataField);
-            }
-
-            if (assetErrorField != null)
-            {
-                generator.Emit(OpCodes.Ldloca_S, 5);
-                generator.Emit(OpCodes.Ldloc_1);
-                generator.Emit(OpCodes.Stfld, assetErrorField);
-            }
-
-            if (originField != null)
-            {
-                generator.Emit(OpCodes.Ldloca_S, 5);
-                generator.Emit(OpCodes.Ldarg_1);
-                generator.Emit(OpCodes.Stfld, originField);
-            }
-
-            generator.Emit(OpCodes.Ldloc_S, 5);
-            generator.Emit(loadFileMethod.GetCallRuntime(), loadFileMethod);
-
-            generator.Emit(OpCodes.Ret);
-
-            LoadFile = (Action<string, AssetOrigin>)dm.CreateDelegate(typeof(Action<string, AssetOrigin>));
-
-            if (setAssetBundle != null)
-            {
-                SetAssetBundle = (Action<MasterBundleConfig, AssetBundle>)setAssetBundle.CreateDelegate(typeof(Action<MasterBundleConfig, AssetBundle>));
-            }
-            if (setHash != null)
+            else
             {
                 SetHash = (Action<MasterBundleConfig, byte[]>)setHash.CreateDelegate(typeof(Action<MasterBundleConfig, byte[]>));
             }
-            if (checkOwnerCustomDataAndMaybeUnload != null)
+
+            MethodInfo? setAssetBundle = typeof(MasterBundleConfig).GetProperty(nameof(MasterBundleConfig.assetBundle), BindingFlags.Public | BindingFlags.Instance)?.GetSetMethod(true);
+            if (setAssetBundle == null)
+            {
+                Logger.DevkitServer.LogError(Source, "Method not found: set MasterBundleConfig.assetBundle.");
+            }
+            else
+            {
+                SetAssetBundle = (Action<MasterBundleConfig, AssetBundle>)setAssetBundle.CreateDelegate(typeof(Action<MasterBundleConfig, AssetBundle>));
+            }
+
+            MethodInfo? checkOwnerCustomDataAndMaybeUnload = typeof(MasterBundleConfig).GetMethod("CheckOwnerCustomDataAndMaybeUnload", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (checkOwnerCustomDataAndMaybeUnload == null)
+            {
+                Logger.DevkitServer.LogError(Source, "Method not found: MasterBundleConfig.CheckOwnerCustomDataAndMaybeUnload.");
+            }
+            else
             {
                 CheckOwnerCustomDataAndMaybeUnload = (Action<MasterBundleConfig>)checkOwnerCustomDataAndMaybeUnload.CreateDelegate(typeof(Action<MasterBundleConfig>));
             }
