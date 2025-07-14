@@ -1,4 +1,4 @@
-﻿using DevkitServer.API;
+using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.API.Lighting;
@@ -515,10 +515,12 @@ public readonly ref struct SetRoadVertexTangentHandleModeProperties(
 
 public delegate void SetRoadMaterial(in SetRoadMaterialProperties properties);
 public delegate void SetRoadMaterialRequested(in SetRoadMaterialProperties properties, ref bool shouldAllow);
-public readonly ref struct SetRoadMaterialProperties(NetId roadNetId, byte materialIndex, float deltaTime)
+public readonly ref struct SetRoadMaterialProperties(NetId roadNetId, RoadMaterialOrAsset material, float deltaTime)
 {
     public readonly NetId RoadNetId = roadNetId;
-    public readonly byte MaterialIndex = materialIndex;
+    public readonly RoadMaterialOrAsset Material = material;
+    [Obsolete("Use Material instead.")]
+    public readonly byte MaterialIndex = material.LegacyIndex;
     public readonly float DeltaTime = deltaTime;
 }
 

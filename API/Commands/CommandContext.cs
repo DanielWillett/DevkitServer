@@ -108,10 +108,10 @@ public class CommandContext : Exception
         }
 #else
         InvokedFromConsole = console;
-        if (DevkitServerModule.UnityLoaded && Player.player != null)
+        if (DevkitServerModule.UnityLoaded && Player.LocalPlayer != null)
         {
             IsConsole = false;
-            Caller = Player.player?.channel.owner;
+            Caller = Player.LocalPlayer?.channel.owner;
             CallerId = Provider.client;
             if (DevkitServerModule.IsEditing)
                 EditorUser = EditorUser.User;

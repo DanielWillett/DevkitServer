@@ -1,4 +1,4 @@
-﻿using DanielWillett.SpeedBytes;
+using DanielWillett.SpeedBytes;
 using DanielWillett.SpeedBytes.Unity;
 using DevkitServer.API;
 using DevkitServer.Configuration;
@@ -43,7 +43,7 @@ public class RoadSync : AuthoritativeSync<RoadSync>
         RoadSyncData obj;
         if (!RoadNetIdDatabase.TryGetRoad(netId, out Road road, out int roadIndex))
         {
-            obj = new RoadSyncData(netId, _dirtyMaterials.Count > 0 ? _dirtyMaterials[^1] : null);
+            obj = new RoadSyncData(netId, _dirtyMaterials.Count > 0 ? new RoadMaterialOrAsset(_dirtyMaterials[^1]) : null);
             if (_dirtyMaterials.Count > 0)
                 _dirtyMaterials.RemoveAt(_dirtyMaterials.Count - 1);
         }
@@ -244,24 +244,30 @@ public class RoadSync : AuthoritativeSync<RoadSync>
         public readonly NetId NetId;
         public readonly bool IsAlive;
         private readonly Vertex[] _vertices;
-        private readonly byte _materialIndex;
+        private readonly RoadMaterialOrAsset _material;
         private readonly bool _isLoop;
         private readonly bool _hasMaterialData;
         private readonly Vector4 _materialDimensions;
         private readonly bool _materialIsConcrete;
-        public RoadSyncData(NetId netId, byte? materialIndex)
+        public RoadSyncData(NetId netId, RoadMaterialOrAsset? material)
         {
             NetId = netId;
             IsAlive = false;
             _vertices = Array.Empty<Vertex>();
 
-            if (materialIndex.HasValue)
+            if (!material.HasValue)
+                return;
+
+            _material = material.Value;
+            if (_material.IsLegacyMaterial && _material.TryGetMaterial(out RoadMaterial? mat))
             {
-                RoadMaterial mat = LevelRoads.materials[materialIndex.Value];
                 _hasMaterialData = true;
                 _materialDimensions = new Vector4(mat.width, mat.height, mat.depth, mat.offset);
                 _materialIsConcrete = mat.isConcrete;
-                _materialIndex = materialIndex.Value;
+            }
+            else
+            {
+                _material = RoadMaterialOrAsset.Empty;
             }
         }
         public RoadSyncData(NetId netId, Road road, int roadIndex, bool materialData)
@@ -269,16 +275,21 @@ public class RoadSync : AuthoritativeSync<RoadSync>
             NetId = netId;
             IsAlive = true;
             _vertices = new Vertex[road.joints.Count];
-            _materialIndex = road.material;
+            _material = road.GetMaterial();
             _isLoop = road.isLoop;
 
-            if (materialData && LevelRoads.materials.Length > road.material)
+            if (materialData)
             {
-                RoadMaterial mat = LevelRoads.materials[road.material];
-                _hasMaterialData = true;
-                _materialDimensions = new Vector4(mat.width, mat.height, mat.depth, mat.offset);
-                _materialIsConcrete = mat.isConcrete;
+                RoadAsset asset = road.GetRoadAsset();
+                if (asset == null && LevelRoads.materials.Length > road.material)
+                {
+                    RoadMaterial mat = LevelRoads.materials[road.material];
+                    _hasMaterialData = true;
+                    _materialDimensions = new Vector4(mat.width, mat.height, mat.depth, mat.offset);
+                    _materialIsConcrete = mat.isConcrete;
+                }
             }
+
             for (int i = 0; i < road.joints.Count; ++i)
             {
                 RoadJoint joint = road.joints[i];
@@ -295,19 +306,19 @@ public class RoadSync : AuthoritativeSync<RoadSync>
             if (_hasMaterialData)
             {
                 _materialDimensions = reader.ReadVector4();
-                _materialIsConcrete = (flags & 8) != 0;
+                _materialIsConcrete = reader.ReadBool();
             }
 
             if (!IsAlive)
             {
                 _vertices = Array.Empty<Vertex>();
                 if (_hasMaterialData)
-                    _materialIndex = reader.ReadUInt8();
+                    _material = new RoadMaterialOrAsset(reader.ReadUInt8());
                 return;
             }
 
             _isLoop = (flags & 2) != 0;
-            _materialIndex = reader.ReadUInt8();
+            _material = new RoadMaterialOrAsset(reader);
             int len = reader.ReadUInt16();
             _vertices = new Vertex[len];
             for (int i = 0; i < len; ++i)
@@ -316,7 +327,7 @@ public class RoadSync : AuthoritativeSync<RoadSync>
         public void Write(ByteWriter writer)
         {
             writer.Write(NetId);
-            byte flags = (byte)((IsAlive ? 1 : 0) | (_isLoop ? 2 : 0) | (_hasMaterialData ? 4 : 0) | (_materialIsConcrete ? 8 : 0));
+            byte flags = (byte)((IsAlive ? 1 : 0) | (_isLoop ? 2 : 0) | (_hasMaterialData ? 4 : 0));
             writer.Write(flags);
             if (_hasMaterialData)
             {
@@ -327,11 +338,11 @@ public class RoadSync : AuthoritativeSync<RoadSync>
             if (!IsAlive)
             {
                 if (_hasMaterialData)
-                    writer.Write(_materialIndex);
+                    writer.Write(_material.LegacyIndex);
                 return;
             }
 
-            writer.Write(_materialIndex);
+            _material.Write(writer);
             writer.Write((ushort)_vertices.Length);
             for (int i = 0; i < _vertices.Length; ++i)
                 _vertices[i].Write(writer);
@@ -344,7 +355,7 @@ public class RoadSync : AuthoritativeSync<RoadSync>
             try
             {
                 Vertex vertex = _vertices[0];
-                Transform vertexTransform = RoadUtil.AddRoadLocal(vertex.Position, _materialIndex);
+                Transform vertexTransform = RoadUtil.AddRoadLocal(vertex.Position, _material);
 
                 if (vertexTransform == null)
                     return;
@@ -415,48 +426,50 @@ public class RoadSync : AuthoritativeSync<RoadSync>
         }
         public bool SyncMaterial(bool holdIsAlreadyDone)
         {
-            if (!_hasMaterialData || _materialIndex >= LevelRoads.materials.Length)
+            if (!_hasMaterialData || !_material.IsLegacyMaterial || !_material.TryGetMaterial(out RoadMaterial? mat))
                 return false;
 
-            RoadMaterial mat = LevelRoads.materials[_materialIndex];
             bool anyUpdates = false;
             if (!holdIsAlreadyDone)
                 RoadUtil.HoldBake = true;
+
+            byte materialIndex = _material.LegacyIndex;
+
             try
             {
                 if (Mathf.Abs(mat.width - _materialDimensions.x) > 0.001f)
                 {
-                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {_materialIndex.Format()}] " +
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {materialIndex.Format()}] " +
                                                         $"Existing width ({mat.width.Format("F2")}) does not match synced width ({_materialDimensions.x.Format("F2")}).");
-                    RoadUtil.SetMaterialWidthLocal(_materialIndex, _materialDimensions.x);
+                    RoadUtil.SetMaterialWidthLocal(materialIndex, _materialDimensions.x);
                     anyUpdates = true;
                 }
                 if (Mathf.Abs(mat.height - _materialDimensions.y) > 0.001f)
                 {
-                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {_materialIndex.Format()}] " +
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {materialIndex.Format()}] " +
                                                         $"Existing height ({mat.height.Format("F2")}) does not match synced height ({_materialDimensions.y.Format("F2")}).");
-                    RoadUtil.SetMaterialHeightLocal(_materialIndex, _materialDimensions.y);
+                    RoadUtil.SetMaterialHeightLocal(materialIndex, _materialDimensions.y);
                     anyUpdates = true;
                 }
                 if (Mathf.Abs(mat.depth - _materialDimensions.z) > 0.001f)
                 {
-                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {_materialIndex.Format()}] " +
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {materialIndex.Format()}] " +
                                                         $"Existing depth ({mat.depth.Format("F2")}) does not match synced depth ({_materialDimensions.z.Format("F2")}).");
-                    RoadUtil.SetMaterialDepthLocal(_materialIndex, _materialDimensions.z);
+                    RoadUtil.SetMaterialDepthLocal(materialIndex, _materialDimensions.z);
                     anyUpdates = true;
                 }
                 if (Mathf.Abs(mat.offset - _materialDimensions.w) > 0.001f)
                 {
-                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {_materialIndex.Format()}] " +
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {materialIndex.Format()}] " +
                                                         $"Existing vertical offset ({mat.offset.Format("F2")}) does not match synced vertical offset ({_materialDimensions.w.Format("F2")}).");
-                    RoadUtil.SetMaterialVerticalOffsetLocal(_materialIndex, _materialDimensions.w);
+                    RoadUtil.SetMaterialVerticalOffsetLocal(materialIndex, _materialDimensions.w);
                     anyUpdates = true;
                 }
                 if (mat.isConcrete != _materialIsConcrete)
                 {
-                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {_materialIndex.Format()}] " +
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {materialIndex.Format()}] " +
                                                         $"Existing isConcrete ({mat.isConcrete.Format()}) does not match synced isConcrete ({_materialIsConcrete.Format()}).");
-                    RoadUtil.SetMaterialIsConcreteLocal(_materialIndex, _materialIsConcrete);
+                    RoadUtil.SetMaterialIsConcreteLocal(materialIndex, _materialIsConcrete);
                     anyUpdates = true;
                 }
             }
@@ -466,7 +479,7 @@ public class RoadSync : AuthoritativeSync<RoadSync>
                 {
                     RoadUtil.HoldBake = false;
                     if (anyUpdates && !DevkitServerConfig.RemoveCosmeticImprovements)
-                        RoadUtil.BakeRoadsWithMaterial(_materialIndex);
+                        RoadUtil.BakeRoadsWithMaterial(materialIndex);
                 }
             }
             return anyUpdates;
@@ -481,11 +494,11 @@ public class RoadSync : AuthoritativeSync<RoadSync>
                 RoadUtil.SetIsLoopLocal(roadIndex, _isLoop);
                 anyUpdates = true;
             }
-            if (road.material != _materialIndex)
+            if (_material.IsSameAsMaterialOf(road))
             {
                 Logger.DevkitServer.LogInfo(Source, $"[ROAD {roadIndex.Format()}] " +
-                                                    $"Existing material ({RoadUtil.MaterialToString(road.material).Format()}) does not match synced material ({RoadUtil.MaterialToString(_materialIndex).Format()}).");
-                RoadUtil.SetMaterialLocal(roadIndex, _materialIndex);
+                                                    $"Existing material ({RoadUtil.MaterialToString(road.material).Format()}) does not match synced material ({_material.Format()}).");
+                RoadUtil.SetMaterialLocal(roadIndex, _material);
                 anyUpdates = true;
             }
 

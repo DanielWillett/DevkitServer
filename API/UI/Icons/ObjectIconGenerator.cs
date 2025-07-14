@@ -1,4 +1,4 @@
-﻿#if CLIENT
+#if CLIENT
 using UnityEngine.Rendering;
 using GraphicsSettings = SDG.Unturned.GraphicsSettings;
 
@@ -75,12 +75,12 @@ public sealed class ObjectIconGenerator : MonoBehaviour
 
         if (asset is VehicleAsset vehicle)
         {
-            VehicleTool.getIcon(vehicle.id, 0, vehicle, null, width, height, false, txt => onIconReady(asset, txt, true, options));
+            VehicleTool.getIcon(vehicle.id, 0, vehicle, null, width, height, false, (_, txt) => onIconReady(asset, txt, true, options));
             return;
         }
         if (asset is ItemAsset item)
         {
-            ItemTool.getIcon(item.id, 0, 100, item.getState(true), item, null, string.Empty, string.Empty, width, height, false, false, txt => onIconReady(asset, txt, true, options));
+            ItemTool.getIcon(item.id, 0, 100, item.getState(true), item, null, string.Empty, string.Empty, width, height, false, false, (_, txt) => onIconReady(asset, txt, true, options));
             return;
         }
 

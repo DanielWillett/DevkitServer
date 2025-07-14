@@ -1,4 +1,4 @@
-﻿using DevkitServer.Core.Commands.Subsystem;
+using DevkitServer.Core.Commands.Subsystem;
 using DevkitServer.Multiplayer.Networking;
 #if CLIENT
 using DevkitServer.Multiplayer;
@@ -272,7 +272,7 @@ public static class PermissionManager
             return true;
 
         ClientInfo? info = ClientInfo.Info;
-        Player? pl = Player.player;
+        Player? pl = Player.LocalPlayer;
         if (checkForSuperuser && info is { ServerTreatsAdminsAsSuperuser: true } && pl != null && pl.channel.owner.isAdmin)
             return true;
 #elif SERVER

@@ -54,7 +54,7 @@ public class UserControl : MonoBehaviour
             if (DevkitServerModule.IsEditing && EditorUser.User?.Control is not null && EditorUser.User.Control.Aim != null)
                 return EditorUser.User.Control.Aim;
 
-            return Level.isEditor || !Level.isLoaded ? MainCamera.instance.transform : Player.player.look.aim;
+            return Level.isEditor || !Level.isLoaded ? MainCamera.instance.transform : Player.LocalPlayer.look.aim;
         }
     }
 #endif

@@ -20,6 +20,8 @@ internal static class RoadsPatches
     private const string Source = "ROADS PATCHES";
     private static bool _changing;
 
+    private static readonly StaticGetter<List<RoadAsset>>? GetRoadSearchAssets = Accessor.GenerateStaticGetter<EditorEnvironmentRoadsUI, List<RoadAsset>>("searchAssets");
+
     private static void Change(Action action)
     {
         _changing = true;
@@ -247,10 +249,10 @@ internal static class RoadsPatches
                 Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onToggledLoopToggle.");
             }
         }
-        method = typeof(EditorEnvironmentRoadsUI).GetMethod("onToggledConcreteToggle", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        method = typeof(EditorEnvironmentRoadsUI).GetMethod("OnLegacyConcreteToggled", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onToggledConcreteToggle.");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.OnLegacyConcreteToggled.");
         }
         else
         {
@@ -279,10 +281,10 @@ internal static class RoadsPatches
                 Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onTypedOffsetField.");
             }
         }
-        method = typeof(EditorEnvironmentRoadsUI).GetMethod("onTypedWidthField", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        method = typeof(EditorEnvironmentRoadsUI).GetMethod("OnLegacyWidthChanged", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onTypedWidthField.");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.OnLegacyWidthChanged.");
         }
         else
         {
@@ -292,13 +294,13 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onTypedWidthField.");
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.OnLegacyWidthChanged.");
             }
         }
-        method = typeof(EditorEnvironmentRoadsUI).GetMethod("onTypedHeightField", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        method = typeof(EditorEnvironmentRoadsUI).GetMethod("OnLegacyHeightChanged", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onTypedHeightField.");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.OnLegacyHeightChanged.");
         }
         else
         {
@@ -308,13 +310,13 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onTypedHeightField.");
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.OnLegacyHeightChanged.");
             }
         }
-        method = typeof(EditorEnvironmentRoadsUI).GetMethod("onTypedDepthField", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        method = typeof(EditorEnvironmentRoadsUI).GetMethod("OnLegacyDepthChanged", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onTypedDepthField.");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.OnLegacyDepthChanged.");
         }
         else
         {
@@ -324,13 +326,13 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onTypedDepthField.");
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.OnLegacyDepthChanged.");
             }
         }
-        method = typeof(EditorEnvironmentRoadsUI).GetMethod("onTypedOffset2Field", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        method = typeof(EditorEnvironmentRoadsUI).GetMethod("OnLegacyMaterialOffsetChanged", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onTypedOffset2Field.");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.OnLegacyMaterialOffsetChanged.");
         }
         else
         {
@@ -340,13 +342,13 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onTypedOffset2Field.");
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.OnLegacyMaterialOffsetChanged.");
             }
         }
-        method = typeof(EditorEnvironmentRoadsUI).GetMethod("onClickedRoadButton", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        method = typeof(EditorEnvironmentRoadsUI).GetMethod("OnLegacyRoadMaterialClicked", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onClickedRoadButton.");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.OnLegacyRoadMaterialClicked.");
         }
         else
         {
@@ -356,7 +358,23 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onClickedRoadButton.");
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.OnLegacyRoadMaterialClicked.");
+            }
+        }
+        method = typeof(EditorEnvironmentRoadsUI).GetMethod("OnAssetClicked", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        if (method == null)
+        {
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.OnAssetClicked.");
+        }
+        else
+        {
+            try
+            {
+                PatchesMain.Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(OnClickedAsset)!));
+            }
+            catch (Exception ex)
+            {
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.OnAssetClicked.");
             }
         }
     }
@@ -721,7 +739,7 @@ internal static class RoadsPatches
         {
             int roadIndex = EditorRoads.road.GetRoadIndex();
 
-            SetRoadMaterialProperties properties = new SetRoadMaterialProperties(GetNetIdOrInvalid(roadIndex), (byte)matIndex, CachedTime.DeltaTime);
+            SetRoadMaterialProperties properties = new SetRoadMaterialProperties(GetNetIdOrInvalid(roadIndex), new RoadMaterialOrAsset((byte)matIndex), CachedTime.DeltaTime);
             if (DevkitServerModule.IsEditing && properties.RoadNetId.id != 0)
             {
                 if (ClientEvents.ListeningOnSetRoadMaterialRequested)
@@ -733,7 +751,48 @@ internal static class RoadsPatches
                 }
             }
 
-            RoadUtil.SetMaterialLocal(EditorRoads.road, matIndex);
+            RoadUtil.SetMaterialLocal(EditorRoads.road, new RoadMaterialOrAsset((byte)matIndex));
+            if (DevkitServerModule.IsEditing && properties.RoadNetId.id != 0)
+                ClientEvents.InvokeOnSetRoadMaterial(in properties);
+        }
+
+        return true;
+    }
+    [UsedImplicitly]
+    private static bool OnClickedAsset(ISleekElement button)
+    {
+        if (DevkitServerModule.IsEditing && !CanEditRoads())
+            return false;
+
+        ISleekElement? scrollBox = button.Parent;
+        if (scrollBox == null)
+            return true;
+
+        int assetIndex = scrollBox.FindIndexOfChild(button);
+        List<RoadAsset>? selection = GetRoadSearchAssets?.Invoke();
+
+        if (selection == null || assetIndex < 0 || assetIndex >= selection.Count)
+            return true;
+
+        RoadAsset asset = selection[assetIndex];
+
+        if (EditorRoads.road != null)
+        {
+            int roadIndex = EditorRoads.road.GetRoadIndex();
+
+            SetRoadMaterialProperties properties = new SetRoadMaterialProperties(GetNetIdOrInvalid(roadIndex), new RoadMaterialOrAsset(asset.GUID), CachedTime.DeltaTime);
+            if (DevkitServerModule.IsEditing && properties.RoadNetId.id != 0)
+            {
+                if (ClientEvents.ListeningOnSetRoadMaterialRequested)
+                {
+                    bool shouldAllow = true;
+                    ClientEvents.InvokeOnSetRoadMaterialRequested(in properties, ref shouldAllow);
+                    if (!shouldAllow)
+                        return false;
+                }
+            }
+
+            RoadUtil.SetMaterialLocal(EditorRoads.road, new RoadMaterialOrAsset(asset.GUID));
             if (DevkitServerModule.IsEditing && properties.RoadNetId.id != 0)
                 ClientEvents.InvokeOnSetRoadMaterial(in properties);
         }

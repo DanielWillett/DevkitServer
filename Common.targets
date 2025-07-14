@@ -7,7 +7,7 @@
         <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="[6.0.0,)">
             <Private>false</Private>
         </PackageReference>
-        <PackageReference Include="System.Text.Json" Version="[8.0.0,9.0.0)">
+        <PackageReference Include="System.Text.Json" Version="[8.0.0,9.0.0)" NoWarn="NU1903">
             <Private>false</Private>
         </PackageReference>
         <PackageReference Include="DanielWillett.StackCleaner" Version="[1.4.2,)">

@@ -1,4 +1,4 @@
-﻿using DanielWillett.SpeedBytes;
+using DanielWillett.SpeedBytes;
 using DanielWillett.SpeedBytes.Unity;
 using DevkitServer.API;
 using DevkitServer.Models;
@@ -80,7 +80,7 @@ public sealed class RoadActions
         EditorActions.QueueAction(new SetRoadMaterialAction
         {
             InstanceId = properties.RoadNetId.id,
-            MaterialIndex = properties.MaterialIndex,
+            Material = properties.Material,
             DeltaTime = properties.DeltaTime
         }, true);
     }
@@ -249,21 +249,21 @@ public sealed class SetRoadIsLoopAction : IReplacableAction, IInstanceIdAction
     }
     public int CalculateSize() => 5;
 }
-[Action(DevkitServerActionType.SetRoadMaterial, 5, 4)]
+[Action(DevkitServerActionType.SetRoadMaterial, 21, 4)]
 public sealed class SetRoadMaterialAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadMaterial;
     public CSteamID Instigator { get; set; }
     public uint InstanceId { get; set; }
     public float DeltaTime { get; set; }
-    public byte MaterialIndex { get; set; }
+    public RoadMaterialOrAsset Material { get; set; }
     public bool TryReplaceFrom(IReplacableAction action)
     {
         SetRoadMaterialAction a = (SetRoadMaterialAction)action;
         if (a.InstanceId != InstanceId)
             return false;
 
-        MaterialIndex = a.MaterialIndex;
+        Material = a.Material;
         return true;
     }
     public void Apply()
@@ -275,7 +275,7 @@ public sealed class SetRoadMaterialAction : IReplacableAction, IInstanceIdAction
             return;
         }
 
-        RoadUtil.SetMaterialLocal(roadIndex, MaterialIndex);
+        RoadUtil.SetMaterialLocal(roadIndex, Material);
     }
 #if SERVER
     public bool CheckCanApply()
@@ -292,14 +292,14 @@ public sealed class SetRoadMaterialAction : IReplacableAction, IInstanceIdAction
     public void Read(ByteReader reader)
     {
         DeltaTime = reader.ReadFloat();
-        MaterialIndex = reader.ReadUInt8();
+        Material = new RoadMaterialOrAsset(reader);
     }
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
-        writer.Write(MaterialIndex);
+        Material.Write(writer);
     }
-    public int CalculateSize() => 5;
+    public int CalculateSize() => Material.IsLegacyMaterial ? 5 : 21;
 }
 
 [Action(DevkitServerActionType.SetRoadVertexIgnoreTerrain, 5, 4)]

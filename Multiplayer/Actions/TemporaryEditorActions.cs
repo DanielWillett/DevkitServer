@@ -1,4 +1,4 @@
-﻿#if CLIENT
+#if CLIENT
 #if DEBUG
 #define PRINT_ACTION_SIMPLE
 #endif
@@ -75,9 +75,9 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Queued level object instantiation for {asset.Format()} from {owner.Format()} when the level loads.");
 #endif
     }
-    internal void QueueRoadInstantiation(long netIds, ushort flags, Vector3 position, Vector3 tangent1, Vector3 tangent2, float offset, ulong owner)
+    internal void QueueRoadInstantiation(long netIds, ushort flags, Guid asset, Vector3 position, Vector3 tangent1, Vector3 tangent2, float offset, ulong owner)
     {
-        _roadInstantiations.Add(new PendingRoadInstantiation(netIds, flags, position, tangent1, tangent2, offset, owner));
+        _roadInstantiations.Add(new PendingRoadInstantiation(netIds, flags, asset, position, tangent1, tangent2, offset, owner));
 #if PRINT_ACTION_SIMPLE
         Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Queued road instantiation at {position.Format()} from {owner.Format()} when the level loads.");
 #endif
@@ -217,7 +217,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         for (int i = 0; i < _roadInstantiations.Count; i++)
         {
             PendingRoadInstantiation roadInstantiation = _roadInstantiations[i];
-            RoadUtil.ReceiveInstantiation(MessageContext.Nil, roadInstantiation.Position, roadInstantiation.Flags,
+            RoadUtil.ReceiveInstantiation(MessageContext.Nil, roadInstantiation.Position, roadInstantiation.Flags, roadInstantiation.Asset,
                 roadInstantiation.Tangent1, roadInstantiation.Tangent2, roadInstantiation.Offset,
                 roadInstantiation.NetIds, roadInstantiation.Owner);
         }
@@ -383,10 +383,11 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         public readonly Vector3 Scale = scale;
         public readonly ulong Owner = owner;
     }
-    private class PendingRoadInstantiation(long netIds, ushort flags, Vector3 position, Vector3 tangent1, Vector3 tangent2, float offset, ulong owner)
+    private class PendingRoadInstantiation(long netIds, ushort flags, Guid asset, Vector3 position, Vector3 tangent1, Vector3 tangent2, float offset, ulong owner)
     {
         public readonly long NetIds = netIds;
         public readonly ushort Flags = flags;
+        public readonly Guid Asset = asset;
         public readonly Vector3 Position = position;
         public readonly Vector3 Tangent1 = tangent1;
         public readonly Vector3 Tangent2 = tangent2;

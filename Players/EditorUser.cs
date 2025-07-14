@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
@@ -273,7 +273,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         if (!DevkitServerModule.IsEditing)
             return;
         Commander.init();
-        if (!SDG.Unturned.Player.player.TryGetComponent(out EditorUser user))
+        if (!SDG.Unturned.Player.LocalPlayer.TryGetComponent(out EditorUser user))
         {
             Logger.DevkitServer.LogWarning("USERS", "Unable to find Editor user in client-side player.");
             return;

@@ -1,4 +1,3 @@
-﻿using DanielWillett.ReflectionTools;
 using DevkitServer.API;
 using DevkitServer.API.Permissions;
 using DevkitServer.Configuration;
@@ -12,6 +11,9 @@ using DevkitServer.Players;
 using System.Globalization;
 #if SERVER
 using DevkitServer.API.UI;
+#endif
+#if CLIENT
+using DanielWillett.ReflectionTools;
 #endif
 
 namespace DevkitServer.Util;
@@ -29,7 +31,10 @@ public delegate void RoadTangentHandleMoved(Road road, RoadTangentHandleIdentifi
 
 public delegate void RoadVertexTangentHandleModeUpdated(Road road, RoadVertexIdentifier handle, ERoadMode fromHandleMode, ERoadMode toHandleMode);
 public delegate void RoadIsLoopUpdated(Road road, int index, bool isLoop);
+
+[Obsolete("Use RoadMaterialOrAssetUpdated instead.")]
 public delegate void RoadMaterialUpdated(Road road, int index, byte fromMaterialIndex, byte toMaterialIndex, RoadMaterial fromMaterial, RoadMaterial toMaterial);
+public delegate void RoadMaterialOrAssetUpdated(Road road, int index, RoadMaterialOrAsset fromAsset, RoadMaterialOrAsset toAsset);
 public delegate void RoadVertexIgnoreTerrainUpdated(Road road, RoadVertexIdentifier handle, bool ignoreTerrain);
 public delegate void RoadVertexVerticalOffsetUpdated(Road road, RoadVertexIdentifier handle, float fromOffset, float toOffset);
 
@@ -62,7 +67,9 @@ public static class RoadUtil
     
     private static readonly CachedMulticastEvent<RoadVertexTangentHandleModeUpdated> EventOnVertexTangentHandleModeUpdated = new CachedMulticastEvent<RoadVertexTangentHandleModeUpdated>(typeof(RoadUtil), nameof(OnVertexTangentHandleModeUpdated));
     private static readonly CachedMulticastEvent<RoadIsLoopUpdated> EventOnIsLoopUpdated = new CachedMulticastEvent<RoadIsLoopUpdated>(typeof(RoadUtil), nameof(OnIsLoopUpdated));
+    [Obsolete("Use EventOnMaterialOrAssetUpdated instead.")]
     private static readonly CachedMulticastEvent<RoadMaterialUpdated> EventOnMaterialUpdated = new CachedMulticastEvent<RoadMaterialUpdated>(typeof(RoadUtil), nameof(OnMaterialUpdated));
+    private static readonly CachedMulticastEvent<RoadMaterialOrAssetUpdated> EventOnMaterialOrAssetUpdated = new CachedMulticastEvent<RoadMaterialOrAssetUpdated>(typeof(RoadUtil), nameof(OnMaterialOrAssetUpdated));
     private static readonly CachedMulticastEvent<RoadVertexIgnoreTerrainUpdated> EventOnVertexIgnoreTerrainUpdated = new CachedMulticastEvent<RoadVertexIgnoreTerrainUpdated>(typeof(RoadUtil), nameof(OnVertexIgnoreTerrainUpdated));
     private static readonly CachedMulticastEvent<RoadVertexVerticalOffsetUpdated> EventOnVertexVerticalOffsetUpdated = new CachedMulticastEvent<RoadVertexVerticalOffsetUpdated>(typeof(RoadUtil), nameof(OnVertexVerticalOffsetUpdated));
     
@@ -73,12 +80,12 @@ public static class RoadUtil
     private static readonly CachedMulticastEvent<RoadMaterialIsConcreteUpdated> EventOnMaterialIsConcreteUpdated = new CachedMulticastEvent<RoadMaterialIsConcreteUpdated>(typeof(RoadUtil), nameof(OnMaterialIsConcreteUpdated));
     
     [UsedImplicitly]
-    private static readonly NetCall<Vector3, byte> SendRequestInstantiation = new NetCall<Vector3, byte>(DevkitServerNetCall.RequestRoadInstantiation);
+    private static readonly NetCall<Vector3, byte, Guid> SendRequestInstantiation = new NetCall<Vector3, byte, Guid>(DevkitServerNetCall.RequestRoadInstantiation);
     [UsedImplicitly]
     private static readonly NetCall<NetId, Vector3, int> SendRequestVertexInstantiation = new NetCall<NetId, Vector3, int>(DevkitServerNetCall.RequestRoadVertexInstantiation);
 
     [UsedImplicitly]
-    private static readonly NetCall<Vector3, ushort, Vector3, Vector3, float, long, ulong> SendInstantiation = new NetCall<Vector3, ushort, Vector3, Vector3, float, long, ulong>(DevkitServerNetCall.SendRoadInstantiation);
+    private static readonly NetCall<Vector3, ushort, Guid, Vector3, Vector3, float, long, ulong> SendInstantiation = new NetCall<Vector3, ushort, Guid, Vector3, Vector3, float, long, ulong>(DevkitServerNetCall.SendRoadInstantiation);
     [UsedImplicitly]
     private static readonly NetCall<NetId, Vector3, Vector3, Vector3, int, ERoadMode, float, bool, NetId, ulong> SendVertexInstantiation = new NetCall<NetId, Vector3, Vector3, Vector3, int, ERoadMode, float, bool, NetId, ulong>(DevkitServerNetCall.SendRoadVertexInstantiation);
     
@@ -170,10 +177,20 @@ public static class RoadUtil
     /// <summary>
     /// Called when a road's <see cref="Road.material"/> is updated locally.
     /// </summary>
+    [Obsolete("Use OnMaterialOrAssetUpdated instead.")]
     public static event RoadMaterialUpdated OnMaterialUpdated
     {
         add => EventOnMaterialUpdated.Add(value);
         remove => EventOnMaterialUpdated.Remove(value);
+    }
+
+    /// <summary>
+    /// Called when a road's <see cref="Road.material"/> or <see cref="Road.RoadAssetRef"/> is updated locally.
+    /// </summary>
+    public static event RoadMaterialOrAssetUpdated OnMaterialOrAssetUpdated
+    {
+        add => EventOnMaterialOrAssetUpdated.Add(value);
+        remove => EventOnMaterialOrAssetUpdated.Remove(value);
     }
 
     /// <summary>
@@ -305,18 +322,23 @@ public static class RoadUtil
         return true;
     }
 
-    /// <summary>
-    /// Sends a request to the server to instantiate a road and a first vertex.
-    /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when not on a DevkitServer server.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Material index was out of range of a byte.</exception>
+    [Obsolete("Use the overload with RoadMaterialOrAsset instead.")]
     public static void RequestRoadInstantiation(Vector3 firstVertexWorldPosition, int materialIndex)
     {
         if (materialIndex is > byte.MaxValue or < 0)
             throw new ArgumentOutOfRangeException(nameof(materialIndex), "Material index must be a byte (0-255).");
 
+        RequestRoadInstantiation(firstVertexWorldPosition, new RoadMaterialOrAsset((byte)materialIndex));
+    }
+    /// <summary>
+    /// Sends a request to the server to instantiate a road and a first vertex.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when not on a DevkitServer server.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Material index was out of range of a byte.</exception>
+    public static void RequestRoadInstantiation(Vector3 firstVertexWorldPosition, RoadMaterialOrAsset material)
+    {
         DevkitServerModule.AssertIsDevkitServerClient();
-        SendRequestInstantiation.Invoke(firstVertexWorldPosition, (byte)materialIndex);
+        SendRequestInstantiation.Invoke(firstVertexWorldPosition, material.LegacyIndex, material.Guid);
     }
 
     /// <summary>
@@ -350,11 +372,11 @@ public static class RoadUtil
     }
 
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendRoadInstantiation)]
-    internal static StandardErrorCode ReceiveInstantiation(MessageContext ctx, Vector3 firstVertexWorldPosition, ushort flags, Vector3 tangent1RelativePosition, Vector3 tangent2RelativePosition, float verticalOffset, long netIdsPacked, ulong owner)
+    internal static StandardErrorCode ReceiveInstantiation(MessageContext ctx, Vector3 firstVertexWorldPosition, ushort flags, Guid asset, Vector3 tangent1RelativePosition, Vector3 tangent2RelativePosition, float verticalOffset, long netIdsPacked, ulong owner)
     {
         if (!EditorActions.HasProcessedPendingRoads)
         {
-            EditorActions.TemporaryEditorActions?.QueueRoadInstantiation(netIdsPacked, flags, firstVertexWorldPosition, tangent1RelativePosition, tangent2RelativePosition, verticalOffset, owner);
+            EditorActions.TemporaryEditorActions?.QueueRoadInstantiation(netIdsPacked, flags, asset, firstVertexWorldPosition, tangent1RelativePosition, tangent2RelativePosition, verticalOffset, owner);
             return StandardErrorCode.Success;
         }
 
@@ -368,7 +390,7 @@ public static class RoadUtil
 
         try
         {
-            Transform vertexTransform = AddRoadLocal(firstVertexWorldPosition, materialIndex);
+            Transform vertexTransform = AddRoadLocal(firstVertexWorldPosition, materialIndex == byte.MaxValue ? new RoadMaterialOrAsset(asset) : new RoadMaterialOrAsset(materialIndex));
 
             if (vertexTransform == null)
                 return StandardErrorCode.GenericError;
@@ -503,7 +525,7 @@ public static class RoadUtil
 #endif
 #if SERVER
     [NetCall(NetCallSource.FromClient, DevkitServerNetCall.RequestRoadInstantiation)]
-    internal static void ReceiveRoadInstantiationRequest(MessageContext ctx, Vector3 firstVertexPosition, byte materialIndex)
+    internal static void ReceiveRoadInstantiationRequest(MessageContext ctx, Vector3 firstVertexPosition, byte materialIndex, Guid roadAssetGuid)
     {
         EditorUser? user = ctx.GetCaller();
         if (user == null || !user.IsOnline)
@@ -520,9 +542,13 @@ public static class RoadUtil
             return;
         }
 
-        AddRoad(firstVertexPosition, materialIndex, ctx);
+        RoadMaterialOrAsset material = materialIndex == byte.MaxValue
+            ? new RoadMaterialOrAsset(roadAssetGuid)
+            : new RoadMaterialOrAsset(materialIndex);
+
+        AddRoad(firstVertexPosition, material, ctx);
         
-        Logger.DevkitServer.LogDebug(Source, $"Granted request for instantiation of road at {firstVertexPosition.Format()}, material: {materialIndex.Format()} from {user.SteamId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Granted request for instantiation of road at {firstVertexPosition.Format()}, material: {material.Format()} from {user.SteamId.Format()}.");
 
         ctx.Acknowledge(StandardErrorCode.Success);
     }
@@ -737,27 +763,18 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally set <see cref="Road.material"/> and call the necessary events.
+    /// Gets a road's material as a <see cref="RoadMaterialOrAsset"/>.
     /// </summary>
-    /// <remarks>Non-replicating.</remarks>
-    /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    /// <returns><see langword="true"/> if <paramref name="materialIndex"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
+    public static RoadMaterialOrAsset GetMaterial(this Road road)
+    {
+        RoadAsset? roadAsset = road.GetRoadAsset();
+        return roadAsset != null ? new RoadMaterialOrAsset(roadAsset.GUID) : new RoadMaterialOrAsset(road.material);
+    }
+
+    [Obsolete("Use the overload with RoadMaterialOrAsset instead.")]
     public static bool SetMaterialLocal(Road road, int materialIndex)
     {
-        ThreadUtil.assertIsGameThread();
-
-        int roadIndex = road.GetRoadIndex();
-        if (roadIndex < 0)
-            throw new ArgumentException("Road is not present in LevelRoads list.", nameof(road));
-
-        if (materialIndex < 0 || materialIndex >= LevelRoads.materials.Length || materialIndex > byte.MaxValue)
-            throw new ArgumentOutOfRangeException(nameof(materialIndex), $"Material #{materialIndex} does not exist.");
-
-        if (road.material == materialIndex)
-            return false;
-
-        SetMaterialLocal(road, roadIndex, (byte)materialIndex);
-        return true;
+        return SetMaterialLocal(road, new RoadMaterialOrAsset(checked ( (byte)materialIndex )));
     }
 
     /// <summary>
@@ -766,7 +783,52 @@ public static class RoadUtil
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <returns><see langword="true"/> if <paramref name="materialIndex"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
+    public static bool SetMaterialLocal(Road road, RoadMaterialOrAsset material)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        int roadIndex = road.GetRoadIndex();
+        if (roadIndex < 0)
+            throw new ArgumentException("Road is not present in LevelRoads list.", nameof(road));
+
+        if (material.IsLegacyMaterial)
+        {
+            if (!material.TryGetMaterial(out RoadMaterial? mat))
+                throw new ArgumentOutOfRangeException(nameof(material), $"Material #{material.LegacyIndex} does not exist.");
+
+            if (road.material == material.LegacyIndex && road.RoadAssetRef.IsEmpty)
+                return false;
+
+            SetMaterialLocal(road, roadIndex, mat, material.LegacyIndex);
+            return true;
+        }
+
+        if (!material.TryGetAsset(out RoadAsset? asset))
+        {
+            if (material.Guid != Guid.Empty)
+                throw new ArgumentOutOfRangeException(nameof(material), $"RoadAsset {material.Guid:N} does not exist.");
+        }
+
+        if (road.RoadAssetRef.Guid == material.Guid)
+            return false;
+
+        SetMaterialLocal(road, roadIndex, asset, material.Guid);
+        return true;
+    }
+
+    [Obsolete("Use the overload with RoadMaterialOrAsset instead.")]
     public static bool SetMaterialLocal(int roadIndex, int materialIndex)
+    {
+        return SetMaterialLocal(roadIndex, new RoadMaterialOrAsset(checked((byte)materialIndex)));
+    }
+
+    /// <summary>
+    /// Locally set <see cref="Road.material"/> and call the necessary events.
+    /// </summary>
+    /// <remarks>Non-replicating.</remarks>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    /// <returns><see langword="true"/> if <paramref name="materialIndex"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
+    public static bool SetMaterialLocal(int roadIndex, RoadMaterialOrAsset material)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -774,23 +836,65 @@ public static class RoadUtil
         if (road == null)
             throw new ArgumentOutOfRangeException(nameof(roadIndex), $"Road #{roadIndex} does not exist.");
 
-        if (materialIndex < 0 || materialIndex >= LevelRoads.materials.Length || materialIndex > byte.MaxValue)
-            throw new ArgumentOutOfRangeException(nameof(materialIndex), $"Material #{materialIndex} does not exist.");
+        if (material.IsLegacyMaterial)
+        {
+            if (!material.TryGetMaterial(out RoadMaterial? mat))
+                throw new ArgumentOutOfRangeException(nameof(material), $"Material #{material.LegacyIndex} does not exist.");
 
-        if (road.material == materialIndex)
+            if (road.material == material.LegacyIndex && road.RoadAssetRef.IsEmpty)
+                return false;
+
+            SetMaterialLocal(road, roadIndex, mat, material.LegacyIndex);
+            return true;
+        }
+
+        if (!material.TryGetAsset(out RoadAsset? asset))
+        {
+            if (material.Guid != Guid.Empty)
+                throw new ArgumentOutOfRangeException(nameof(material), $"RoadAsset {material.Guid:N} does not exist.");
+        }
+
+        if (road.RoadAssetRef.Guid == material.Guid)
             return false;
 
-        SetMaterialLocal(road, roadIndex, (byte)materialIndex);
+        SetMaterialLocal(road, roadIndex, asset, material.Guid);
         return true;
     }
-    internal static void SetMaterialLocal(Road road, int roadIndex, byte materialIndex)
+
+    internal static void SetMaterialLocal(Road road, int roadIndex, RoadMaterial material, byte materialIndex)
     {
-        byte oldMaterialIndex = road.material;
+        RoadMaterialOrAsset oldMaterial = road.GetMaterial();
         road.material = materialIndex;
+        road.RoadAssetRef = CachingAssetRef.Empty;
 
-        EventOnMaterialUpdated.TryInvoke(road, roadIndex, oldMaterialIndex, materialIndex, LevelRoads.materials[oldMaterialIndex], LevelRoads.materials[materialIndex]);
+#pragma warning disable CS0618
+        if (oldMaterial.IsLegacyMaterial && oldMaterial.LegacyIndex < LevelRoads.materials.Length)
+        {
+            EventOnMaterialUpdated.TryInvoke(road, roadIndex, oldMaterial.LegacyIndex, materialIndex, LevelRoads.materials[oldMaterial.LegacyIndex], LevelRoads.materials[materialIndex]);
+        }
+#pragma warning restore CS0618
 
-        Logger.DevkitServer.LogDebug(nameof(SetMaterialLocal), $"Road material updated: {roadIndex.Format()} {oldMaterialIndex.Format()} -> {materialIndex.Format()}.");
+        EventOnMaterialOrAssetUpdated.TryInvoke(road, roadIndex, oldMaterial, new RoadMaterialOrAsset(materialIndex));
+
+        Logger.DevkitServer.LogDebug(nameof(SetMaterialLocal), $"Road material updated: {roadIndex.Format()} {oldMaterial.Format()} -> {materialIndex.Format()}.");
+
+        if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
+            road.buildMesh();
+
+        SyncIfAuthority(roadIndex);
+
+        // todo update UI
+    }
+
+    internal static void SetMaterialLocal(Road road, int roadIndex, RoadAsset? asset, Guid assetGuid)
+    {
+        RoadMaterialOrAsset oldMaterial = road.GetMaterial();
+        road.material = byte.MaxValue;
+        road.RoadAssetRef = new CachingAssetRef(asset);
+
+        EventOnMaterialOrAssetUpdated.TryInvoke(road, roadIndex, oldMaterial, new RoadMaterialOrAsset(assetGuid));
+
+        Logger.DevkitServer.LogDebug(nameof(SetMaterialLocal), $"Road material updated: {roadIndex.Format()} {oldMaterial.Format()} -> {assetGuid.Format()}.");
 
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             road.buildMesh();
@@ -1169,22 +1273,37 @@ public static class RoadUtil
         SyncIfAuthority(roadIndex);
     }
 
+    [Obsolete("Use the overload with RoadMaterialOrAsset instead.")]
+    public static Transform AddRoadLocal(Vector3 firstVertexWorldPosition, byte materialIndex)
+    {
+        return AddRoadLocal(firstVertexWorldPosition, new RoadMaterialOrAsset(materialIndex));
+    }
+
     /// <summary>
     /// Locally call <see cref="LevelRoads.addRoad"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Invalid asset or material index.</exception>
     /// <returns>The <see cref="Transform"/> of the first vertex of the road.</returns>
-    public static Transform AddRoadLocal(Vector3 firstVertexWorldPosition, byte materialIndex)
+    public static Transform AddRoadLocal(Vector3 firstVertexWorldPosition, RoadMaterialOrAsset material)
     {
         ThreadUtil.assertIsGameThread();
 
+        if (!material.CheckValid())
+        {
+            throw new ArgumentOutOfRangeException(nameof(material), $"Material {material} doesn't represent a valid asset or material index.");
+        }
+
         byte selectedOld = EditorRoads.selected;
-        EditorRoads.selected = materialIndex;
+        CachingAssetRef selectedAssetRefOld = EditorRoads.selectedAssetRef;
+        EditorRoads.selected = material.LegacyIndex;
+        EditorRoads.selectedAssetRef = material.IsLegacyMaterial ? default : new CachingAssetRef(material.Guid);
 
         Transform transform = LevelRoads.addRoad(firstVertexWorldPosition);
 
         EditorRoads.selected = selectedOld;
+        EditorRoads.selectedAssetRef = selectedAssetRefOld;
 
         Road road = LevelRoads.getRoad(transform, out int vertexIndex, out _);
         int roadIndex = road.GetRoadIndex();
@@ -1433,31 +1552,44 @@ public static class RoadUtil
     }
 
 #if SERVER
+
+    [Obsolete("Use the overload with RoadMaterialOrAsset instead.")]
+    public static Transform AddRoad(Vector3 firstVertexWorldPosition, byte materialIndex, EditorUser? owner = null)
+    {
+        return AddRoad(firstVertexWorldPosition, new RoadMaterialOrAsset(materialIndex), owner);
+    }
+
     /// <summary>
     /// Call <see cref="LevelRoads.addRoad"/> and call the necessary events.
     /// </summary
     /// <remarks>Replicates to clients.</remarks>
     /// <param name="owner">Optional owner/placer for the road.</param>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Road asset or material not found.</exception>
     /// <returns>The <see cref="Transform"/> of the first vertex of the road.</returns>
-    public static Transform AddRoad(Vector3 firstVertexWorldPosition, byte materialIndex, EditorUser? owner = null)
+    public static Transform AddRoad(Vector3 firstVertexWorldPosition, RoadMaterialOrAsset material, EditorUser? owner = null)
     {
         ThreadUtil.assertIsGameThread();
 
-        return AddRoad(firstVertexWorldPosition, materialIndex, owner == null ? MessageContext.Nil : MessageContext.CreateFromCaller(owner));
+        return AddRoad(firstVertexWorldPosition, material, owner == null ? MessageContext.Nil : MessageContext.CreateFromCaller(owner));
     }
-    internal static Transform AddRoad(Vector3 firstVertexWorldPosition, byte materialIndex, MessageContext ctx)
+
+    internal static Transform AddRoad(Vector3 firstVertexWorldPosition, RoadMaterialOrAsset material, MessageContext ctx)
     {
         ulong owner = ctx.GetCaller() is { } user ? user.SteamId.m_SteamID : 0ul;
 
         byte oldSelected = EditorRoads.selected;
-        EditorRoads.selected = materialIndex;
+        CachingAssetRef oldSelectedAssetRef = EditorRoads.selectedAssetRef;
+        EditorRoads.selected = material.LegacyIndex;
+        EditorRoads.selectedAssetRef = material.IsLegacyMaterial ? default : new CachingAssetRef(material.Guid);
 
-        // todo add bounds checks
+        if (!material.CheckValid())
+            throw new ArgumentOutOfRangeException(nameof(material), "Invalid material or road asset.");
 
         Transform transform = LevelRoads.addRoad(firstVertexWorldPosition);
 
         EditorRoads.selected = oldSelected;
+        EditorRoads.selectedAssetRef = oldSelectedAssetRef;
 
         InitializeRoad(transform, out Road road, out NetId roadNetId, out NetId vertexNetId);
         int roadIndex = road.GetRoadIndex();
@@ -1474,18 +1606,18 @@ public static class RoadUtil
         RoadJoint joint = road.joints[0];
 
         long netIdsPacked = ((long)vertexNetId.id << 32) | roadNetId.id;
-        ushort flags = (ushort)(materialIndex | (road.isLoop ? 1 << 8 : 0) | (joint.ignoreTerrain ? 1 << 9 : 0) | ((int)joint.mode << 10));
+        ushort flags = (ushort)(material.LegacyIndex | (road.isLoop ? 1 << 8 : 0) | (joint.ignoreTerrain ? 1 << 9 : 0) | ((int)joint.mode << 10));
 
         PooledTransportConnectionList list;
         if (!ctx.IsRequest)
             list = DevkitServerUtility.GetAllConnections();
         else
         {
-            ctx.ReplyLayered(SendInstantiation, firstVertexWorldPosition, flags, joint.getTangent(0), joint.getTangent(1), joint.offset, netIdsPacked, owner);
+            ctx.ReplyLayered(SendInstantiation, firstVertexWorldPosition, flags, material.Guid, joint.getTangent(0), joint.getTangent(1), joint.offset, netIdsPacked, owner);
             list = DevkitServerUtility.GetAllConnections(ctx.Connection);
         }
 
-        SendInstantiation.Invoke(list, firstVertexWorldPosition, flags, joint.getTangent(0), joint.getTangent(1), joint.offset, netIdsPacked, owner);
+        SendInstantiation.Invoke(list, firstVertexWorldPosition, flags, material.Guid, joint.getTangent(0), joint.getTangent(1), joint.offset, netIdsPacked, owner);
 
         SyncIfAuthority(roadIndex);
 
@@ -1802,6 +1934,12 @@ public static class RoadUtil
         return true;
     }
 
+    [Obsolete("Use the overload with RoadMaterialOrAsset instead.")]
+    public static bool SetMaterial(Road road, int materialIndex)
+    {
+        return SetMaterial(road, new RoadMaterialOrAsset(checked((byte)materialIndex)));
+    }
+
     /// <summary>
     /// Set the <see cref="Road.material"/> property and call the necessary events.
     /// </summary>
@@ -1809,7 +1947,7 @@ public static class RoadUtil
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditRoads"/>.</exception>
     /// <returns><see langword="true"/> if <paramref name="materialIndex"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
-    public static bool SetMaterial(Road road, int materialIndex)
+    public static bool SetMaterial(Road road, RoadMaterialOrAsset material)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -1817,10 +1955,13 @@ public static class RoadUtil
         if (roadIndex < 0)
             throw new ArgumentException("Road is not present in LevelRoads list.", nameof(road));
 
-        if (materialIndex < 0 || materialIndex >= LevelRoads.materials.Length || materialIndex > byte.MaxValue)
-            throw new ArgumentOutOfRangeException(nameof(materialIndex), $"Material #{materialIndex} does not exist.");
+        return SetMaterial(road, roadIndex, material);
+    }
 
-        return SetMaterial(road, roadIndex, (byte)materialIndex);
+    [Obsolete("Use the overload with RoadMaterialOrAsset instead.")]
+    public static bool SetMaterial(int roadIndex, int materialIndex)
+    {
+        return SetMaterial(roadIndex, new RoadMaterialOrAsset(checked((byte)materialIndex)));
     }
 
     /// <summary>
@@ -1830,7 +1971,7 @@ public static class RoadUtil
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditRoads"/>.</exception>
     /// <returns><see langword="true"/> if <paramref name="materialIndex"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
-    public static bool SetMaterial(int roadIndex, int materialIndex)
+    public static bool SetMaterial(int roadIndex, RoadMaterialOrAsset material)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -1838,37 +1979,35 @@ public static class RoadUtil
         if (road == null)
             throw new ArgumentOutOfRangeException(nameof(roadIndex), $"Road #{roadIndex} does not exist.");
 
-        if (materialIndex < 0 || materialIndex >= LevelRoads.materials.Length || materialIndex > byte.MaxValue)
-            throw new ArgumentOutOfRangeException(nameof(materialIndex), $"Material #{materialIndex} does not exist.");
-
-        return SetMaterial(road, roadIndex, (byte)materialIndex);
+        return SetMaterial(road, roadIndex, material);
     }
-    private static bool SetMaterial(Road road, int roadIndex, byte materialIndex)
+
+    private static bool SetMaterial(Road road, int roadIndex, RoadMaterialOrAsset material)
     {
 #if CLIENT
         CheckEditRoad();
 #endif
-        if (road.material == materialIndex)
+        if (material.IsSameAsMaterialOf(road))
             return false;
 
-        SetMaterialLocal(road, roadIndex, materialIndex);
+        SetMaterialLocal(roadIndex, material);
 
         if (DevkitServerModule.IsEditing)
         {
             if (!RoadNetIdDatabase.TryGetRoadNetId(roadIndex, out NetId netId))
             {
-                Logger.DevkitServer.LogWarning(nameof(SetMaterial), $"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetMaterial({roadIndex.Format()}, {materialIndex.Format()}).");
+                Logger.DevkitServer.LogWarning(nameof(SetMaterial), $"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetMaterial({roadIndex.Format()}, {material.Format()}).");
                 return true;
             }
 
 #if CLIENT
-            ClientEvents.InvokeOnSetRoadMaterial(new SetRoadMaterialProperties(netId, materialIndex, CachedTime.DeltaTime));
+            ClientEvents.InvokeOnSetRoadMaterial(new SetRoadMaterialProperties(netId, material, CachedTime.DeltaTime));
 #else
             EditorActions.QueueServerAction(new SetRoadMaterialAction
             {
                 DeltaTime = CachedTime.DeltaTime,
                 InstanceId = netId.id,
-                MaterialIndex = materialIndex
+                Material = material
             });
 #endif
         }
