@@ -62,12 +62,12 @@ internal static class FoliageEditorPatches
 
         MethodInfo? rspDestroy = typeof(ResourceSpawnpoint).GetMethod(nameof(ResourceSpawnpoint.destroy),
             BindingFlags.Public | BindingFlags.Instance);
-        if (removeInstances == null)
+        if (rspDestroy == null)
             Logger.DevkitServer.LogWarning("FOLIAGE PATCHES", "Unable to find method: ResourceSpawnpoint.destroy.");
 
         MethodInfo? lvlObjRemove = typeof(LevelObjects).GetMethod(nameof(LevelObjects.removeObject),
             BindingFlags.Public | BindingFlags.Static);
-        if (removeInstances == null)
+        if (lvlObjRemove == null)
             Logger.DevkitServer.LogWarning("FOLIAGE PATCHES", "Unable to find method: LevelObjects.removeObject.");
 
         MethodInfo? lvlObjTransformGetter = typeof(LevelObject).GetProperty(nameof(LevelObject.transform), BindingFlags.Public | BindingFlags.Instance)?.GetMethod;
@@ -94,22 +94,35 @@ internal static class FoliageEditorPatches
                 ParameterInfo[] ps = removeInstances.GetParameters();
                 if (i > ps.Length)
                 {
+                    int commitIndex = Array.FindIndex(ps, p => p.ParameterType == typeof(bool));
+                    int commitInstructionIndex = i - (ps.Length - commitIndex);
                     if (ps[^1].ParameterType is { IsByRef: true } p && p.GetElementType() == typeof(int))
                     {
                         LocalBuilder? bld = PatchUtility.GetLocal(ins[i - 1], out int index, false);
-                        yield return PatchHelpers.GetLocalCodeInstruction(bld!, index, false);
+                        yield return PatchHelpers.GetLocalCodeInstruction(bld!, index, false, byRef: true);
                         yield return PatchHelpers.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, true);
                         Logger.DevkitServer.LogDebug("FOLIAGE PATCHES", "Inserted set sample count local instruction.");
                     }
                     yield return c;
+                    Label? notCommittingLabel = null;
+                    if (commitIndex >= 0)
+                    {
+                        CodeInstruction loadInstruction = ins[commitInstructionIndex];
+                        LocalBuilder? bld = PatchUtility.GetLocal(loadInstruction, out int index, false);
+                        yield return PatchHelpers.GetLocalCodeInstruction(bld!, index, false);
+                        notCommittingLabel = generator.DefineLabel();
+                        yield return new CodeInstruction(OpCodes.Brfalse, notCommittingLabel);
+                    }
                     for (int j = i - ps.Length; j < i; ++j)
                     {
                         CodeInstruction l = ins[j];
+                        if (j == commitInstructionIndex)
+                            continue;
+
                         if (l.opcode == OpCodes.Ldloca_S || l.opcode == OpCodes.Ldloca)
                         {
                             if (l.operand is LocalBuilder lbl)
-                                yield return PatchHelpers.GetLocalCodeInstruction(lbl, lbl.LocalIndex, false,
-                                    false);
+                                yield return PatchHelpers.GetLocalCodeInstruction(lbl, lbl.LocalIndex, false, false);
                             else
                                 yield return new CodeInstruction(l.opcode == OpCodes.Ldloca_S ? OpCodes.Ldarg_S : OpCodes.Ldarg, l.operand);
                             yield return PatchHelpers.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, false);
@@ -119,6 +132,8 @@ internal static class FoliageEditorPatches
                             yield return ins[j];
                     }
                     yield return new CodeInstruction(OpCodes.Call, removeInstancesInvoker);
+                    if (notCommittingLabel.HasValue)
+                        yield return new CodeInstruction(OpCodes.Nop) { labels = [ notCommittingLabel.Value ] };
                     Logger.DevkitServer.LogDebug("FOLIAGE PATCHES", "Patched invoker for " + removeInstances.Format() + ".");
                     ++ri;
                 }
@@ -238,14 +253,14 @@ internal static class FoliageEditorPatches
     }
 
     [UsedImplicitly]
-    private static void OnRemoveInstances(FoliageTile foliageTile, FoliageInstanceList list, float sqrBrushRadius, float sqrBrushFalloffRadius, bool allowRemoveBaked, int sampleCount, int oldSampleCount)
+    private static void OnRemoveInstances(FoliageTile foliageTile, FoliageInstanceList list, float sqrBrushRadius, float sqrBrushFalloffRadius, EFoliageRemovalFilter filter, int sampleCount, int oldSampleCount)
     {
         if (sampleCount == oldSampleCount || !DevkitServerModule.IsEditing || !InputEx.GetKey(KeyCode.Mouse0) ||
             GetFoliageBrushWorldPosition == null || UserControl.ActiveTool is not { } tool) return;
 
         ClientEvents.InvokeOnRemoveFoliage(new RemoveFoliageProperties(GetFoliageBrushWorldPosition(tool), foliageTile,
             list, DevkitFoliageToolOptions.instance.brushRadius, DevkitFoliageToolOptions.instance.brushFalloff,
-            CachedTime.DeltaTime, allowRemoveBaked, oldSampleCount - sampleCount));
+            CachedTime.DeltaTime, filter, oldSampleCount - sampleCount));
     }
 
     [UsedImplicitly]

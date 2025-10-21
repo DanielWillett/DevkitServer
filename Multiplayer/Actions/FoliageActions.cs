@@ -71,7 +71,7 @@ public sealed class FoliageActions
             BrushPosition = properties.BrushPosition,
             BrushRadius = properties.BrushRadius,
             BrushFalloff = properties.BrushFalloff,
-            AllowRemoveBaked = properties.AllowRemovingBakedFoliage,
+            RemovalFilter = properties.Filter,
             SampleCount = properties.SampleCount,
             DeltaTime = properties.DeltaTime
         });
@@ -108,8 +108,8 @@ public sealed class FoliageActions
 [EarlyTypeInit]
 public sealed class AddFoliageToSurfaceAction : IServersideAction, IAssetAction
 {
-    private static readonly Action<FoliageInfoAsset, Vector3, Quaternion, Vector3, bool>? ExecuteAddFoliage
-        = Accessor.GenerateInstanceCaller<FoliageInfoAsset, Action<FoliageInfoAsset, Vector3, Quaternion, Vector3, bool>>("addFoliage", throwOnError: false, allowUnsafeTypeBinding: true);
+    private static readonly Action<FoliageInfoAsset, Vector3, Quaternion, Vector3, bool>? ExecuteAddFoliage                                                                          // virtual call
+        = Accessor.GenerateInstanceCaller<FoliageInfoAsset, Action<FoliageInfoAsset, Vector3, Quaternion, Vector3, bool>>("addFoliage", throwOnError: false, allowUnsafeTypeBinding: false);
     public DevkitServerActionType Type => DevkitServerActionType.AddFoliageToSurface;
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
@@ -228,7 +228,7 @@ public sealed class AddFoliageToSurfaceAction : IServersideAction, IAssetAction
     ;
 }
 
-[Action(DevkitServerActionType.RemoveFoliageInstances, 16, 36)]
+[Action(DevkitServerActionType.RemoveFoliageInstances, 17, 36)]
 [EarlyTypeInit]
 public sealed class RemoveFoliageInstancesAction : IAction, ICoordinatesAction, IBrushRadiusAction, IBrushFalloffAction, IAssetAction
 {
@@ -247,7 +247,7 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinatesAction, 
     public int CoordinateX { get; set; }
     public int CoordinateY { get; set; }
     public int SampleCount { get; set; }
-    public bool AllowRemoveBaked { get; set; }
+    public EFoliageRemovalFilter RemovalFilter { get; set; }
     public void Apply()
     {
         FoliageTile tile = FoliageSystem.getTile(new FoliageCoord(CoordinateX, CoordinateY));
@@ -266,6 +266,7 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinatesAction, 
         float sqrBrushRadius = BrushRadius * BrushRadius;
         float sqrBrushFalloffRadius = sqrBrushRadius * BrushFalloff * BrushFalloff;
         int sampleCount = SampleCount;
+        EFoliageRemovalFilter removalFilter = RemovalFilter;
 
         // FoliageEditor.removeInstances
         for (int index1 = list.matrices.Count - 1; index1 >= 0; --index1)
@@ -274,7 +275,8 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinatesAction, 
             List<bool> boolList = list.clearWhenBaked[index1];
             for (int index2 = matrix.Count - 1; index2 >= 0; --index2)
             {
-                if (boolList[index2] && !AllowRemoveBaked)
+                EFoliageRemovalFilter option = boolList[index2] ? EFoliageRemovalFilter.Baked : EFoliageRemovalFilter.ManuallyPlaced;
+                if ((removalFilter & option) == 0)
                     continue;
 
                 Vector3 position = matrix[index2].GetPosition();
@@ -304,13 +306,15 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinatesAction, 
     {
         writer.Write(DeltaTime);
         writer.Write(BrushPosition);
+        writer.Write((byte)RemovalFilter);
     }
     public void Read(ByteReader reader)
     {
         DeltaTime = reader.ReadFloat();
         BrushPosition = reader.ReadVector3();
+        RemovalFilter = (EFoliageRemovalFilter)reader.ReadUInt8();
     }
-    public int CalculateSize() => 16;
+    public int CalculateSize() => 17;
 }
 
 [Action(DevkitServerActionType.RemoveResourceSpawnpoint, 16, 16)]
@@ -330,9 +334,10 @@ public sealed class RemoveResourceSpawnpointAction : IAction, IAssetAction
     public void Apply()
     {
         Vector3 pos = ResourcePosition;
-        if (Regions.tryGetCoordinate(pos, out byte x, out byte y))
+        Vector2Int coord = Regions.GetCoordinateVector2Int(pos);
+        List<ResourceSpawnpoint>? region = LevelGround.GetTreesOrNullInRegion(coord);
+        if (region != null)
         {
-            List<ResourceSpawnpoint> region = LevelGround.trees[x, y];
             for (int i = 0; i < region.Count; ++i)
             {
                 ResourceSpawnpoint sp = region[i];
@@ -348,13 +353,9 @@ public sealed class RemoveResourceSpawnpointAction : IAction, IAssetAction
 
                 Logger.DevkitServer.LogWarning(FoliageActions.Source, "Found matching position but different GUID: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " vs " + sp.asset.FriendlyName.Format() + ".");
             }
+        }
 
-            Logger.DevkitServer.LogWarning(FoliageActions.Source, "Resource not found: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " at " + ResourcePosition.Format() + ".");
-        }
-        else
-        {
-            Logger.DevkitServer.LogWarning(FoliageActions.Source, "Resource out of bounds: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " at " + ResourcePosition.Format() + ".");
-        }
+        Logger.DevkitServer.LogWarning(FoliageActions.Source, "Resource not found: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " at " + ResourcePosition.Format() + ".");
     }
 #if SERVER
     public bool CheckCanApply()

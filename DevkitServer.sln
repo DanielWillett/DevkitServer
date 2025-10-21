@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.5.33402.96
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.11116.177 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DevkitServer", "DevkitServer.csproj", "{C0FAB04D-A5EF-4A40-88EC-4F8F9FB24180}"
 EndProject
@@ -11,7 +11,7 @@ Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "Unturned", "C:\SteamCMD\ste
 		Executable = C:\SteamCMD\steamapps\common\U3DS\Unturned.exe
 		RemoteMachine = DANIEL-DESKTOP
 		StartingDirectory = C:\SteamCMD\steamapps\common\U3DS
-		Arguments = -batchmode -nographics -Skip!Assets -LogBadMessages -AutoRestartDevkitServerUpdates -!DevkitServerDebugLog -DevkitServerCheckUpdateInterval 30 -DevkitServerCheckUpdateShutdownDelay 30 -disableModule/Uncreated.Warfare -disableModule/UncreatedWarfare -disableModule/OpenMod.Unturned +insecureserver/DevkitServerTest
+		Arguments = -batchmode -nographics -Skip!Assets -LogBadMessages -AutoRestartDevkitServerUpdates -DevkitServerDebugLog -DevkitServerCheckUpdateInterval 30 -DevkitServerCheckUpdateShutdownDelay 30 -disableModule/Uncreated.Warfare -disableModule/UncreatedWarfare -disableModule/OpenMod.Unturned +insecureserver/DevkitServerTest
 		Environment = Default
 		LaunchingEngine = 5fff7536-0c87-462d-8fd2-7971d948e6dc
 		UseLegacyDebugEngines = No

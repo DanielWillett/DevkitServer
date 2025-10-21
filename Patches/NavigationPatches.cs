@@ -83,7 +83,7 @@ internal static class NavigationPatches
         if (_baking == __instance)
         {
             _hasStartedBakingTiles = false;
-            _baking = null;
+            _baking = null; 
         }
     }
 #endif

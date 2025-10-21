@@ -624,6 +624,19 @@ public static class RoadUtil
     }
 
     /// <summary>
+    /// Get a text-based identifier for a <see cref="RoadMaterial"/>, which is the texture name if available, otherwie the material index.
+    /// </summary>
+    public static string MaterialToString(Road road)
+    {
+        if (road.GetRoadAsset() is { } asset)
+        {
+            return asset.FriendlyName;
+        }
+
+        return MaterialToString(road.material);
+    }
+
+    /// <summary>
     /// Remesh all roads with the material <paramref name="materialIndex"/>.
     /// </summary>
     /// <exception cref="NotSupportedException"></exception>
@@ -1676,10 +1689,11 @@ public static class RoadUtil
         ulong owner = ctx.GetCaller() is { } user ? user.SteamId.m_SteamID : 0ul;
         
         Transform transform = road.addVertex(vertexIndex, worldPosition);
-        InitializeVertex(road, roadIndex, vertexIndex, out NetId netId);
 
         for (int i = vertexIndex + 1; i < road.joints.Count; ++i)
             EventOnVertexIndexUpdated.TryInvoke(road, new RoadVertexIdentifier(roadIndex, i - 1), new RoadVertexIdentifier(roadIndex, i));
+
+        InitializeVertex(road, roadIndex, vertexIndex, out NetId netId);
 
         EventOnVertexAdded.TryInvoke(road, new RoadVertexIdentifier(roadIndex, vertexIndex));
 

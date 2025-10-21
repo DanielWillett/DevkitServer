@@ -494,10 +494,10 @@ public class RoadSync : AuthoritativeSync<RoadSync>
                 RoadUtil.SetIsLoopLocal(roadIndex, _isLoop);
                 anyUpdates = true;
             }
-            if (_material.IsSameAsMaterialOf(road))
+            if (!_material.IsSameAsMaterialOf(road))
             {
                 Logger.DevkitServer.LogInfo(Source, $"[ROAD {roadIndex.Format()}] " +
-                                                    $"Existing material ({RoadUtil.MaterialToString(road.material).Format()}) does not match synced material ({_material.Format()}).");
+                                                    $"Existing material ({RoadUtil.MaterialToString(road).Format()}) does not match synced material ({_material.Format()}).");
                 RoadUtil.SetMaterialLocal(roadIndex, _material);
                 anyUpdates = true;
             }

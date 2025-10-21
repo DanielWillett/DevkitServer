@@ -113,15 +113,16 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
             return EObjectChart.NONE;
         }
 
-        if (layer != LayerMasks.RESOURCE || !Regions.tryGetCoordinate(transform.position, out x, out y))
+        if (layer != LayerMasks.RESOURCE)
             return EObjectChart.NONE;
 
-        List<ResourceSpawnpoint> spawnpoints = LevelGround.trees[x, y];
+        Vector2Int pos = Regions.GetCoordinateVector2Int(transform.position);
+        List<ResourceSpawnpoint>? spawnpoints = LevelGround.GetTreesOrNullInRegion(pos);
 
-        ct = spawnpoints.Count;
+        ct = spawnpoints?.Count ?? 0;
         for (int i = 0; i < ct; ++i)
         {
-            ResourceSpawnpoint sp = spawnpoints[i];
+            ResourceSpawnpoint sp = spawnpoints![i];
             if (!ReferenceEquals(sp.model, transform))
                 continue;
 
@@ -137,7 +138,7 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
         transform = transform.root;
         for (int i = 0; i < ct; ++i)
         {
-            ResourceSpawnpoint sp = spawnpoints[i];
+            ResourceSpawnpoint sp = spawnpoints![i];
             if (!ReferenceEquals(sp.model, transform))
                 continue;
 

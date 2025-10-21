@@ -821,14 +821,14 @@ internal static class RoadsPatches
                     return null;
             }
 
-            RoadUtil.RequestRoadInstantiation(point, EditorRoads.selected);
+            RoadUtil.RequestRoadInstantiation(point, RoadMaterialOrAsset.Selected);
 
             ClientEvents.EventOnRequestInstantiateRoad.TryInvoke(in properties);
             
             return null;
         }
 
-        return RoadUtil.AddRoadLocal(point, EditorRoads.selected);
+        return RoadUtil.AddRoadLocal(point, RoadMaterialOrAsset.Selected);
     }
     private static Transform? AddVertex(Road road, int vertexIndex, Vector3 point)
     {

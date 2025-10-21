@@ -59,7 +59,7 @@ public readonly ref struct RemoveFoliageProperties(
     float brushRadius,
     float brushFalloff,
     float deltaTime,
-    bool allowRemovingBakedFoliage,
+    EFoliageRemovalFilter filter,
     int sampleCount)
 {
     public readonly Vector3 BrushPosition = brushPosition;
@@ -68,8 +68,18 @@ public readonly ref struct RemoveFoliageProperties(
     public readonly float BrushRadius = brushRadius;
     public readonly float BrushFalloff = brushFalloff;
     public readonly float DeltaTime = deltaTime;
-    public readonly bool AllowRemovingBakedFoliage = allowRemovingBakedFoliage;
+    public readonly EFoliageRemovalFilter Filter = filter;
     public readonly int SampleCount = sampleCount;
+}
+
+// clone of FoliageEditor.EFoliageRemovalFilter
+[Flags]
+public enum EFoliageRemovalFilter
+{
+    None = 0,
+    ManuallyPlaced = 1,
+    Baked = 2,
+    All = Baked | ManuallyPlaced,
 }
 
 public delegate void RemoveResourceSpawnpointFoliage(in RemoveResourceSpawnpointFoliageProperties foliageProperties);

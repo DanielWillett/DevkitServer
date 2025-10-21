@@ -36,6 +36,23 @@ public readonly struct RoadMaterialOrAsset :
     /// </summary>
     public bool IsLegacyMaterial => LegacyIndex != byte.MaxValue;
 
+    /// <summary>
+    /// The currently selected road asset.
+    /// </summary>
+    public static RoadMaterialOrAsset Selected
+    {
+        get
+        {
+            ThreadUtil.assertIsGameThread();
+
+            RoadAsset? roadAsset = EditorRoads.selectedAssetRef.Get<RoadAsset>();
+            if (roadAsset == null)
+                return new RoadMaterialOrAsset(EditorRoads.selected);
+
+            return new RoadMaterialOrAsset(roadAsset.GUID);
+        }
+    }
+
     public RoadMaterialOrAsset(Guid guid)
     {
         Guid = guid;
