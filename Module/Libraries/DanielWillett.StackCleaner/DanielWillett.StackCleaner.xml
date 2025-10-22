@@ -130,7 +130,7 @@
             <returns>An exact copy of this <see cref="T:StackCleaner.StackCleanerConfiguration"/>, safe to cast. Never is frozen.</returns>
         </member>
         <member name="M:StackCleaner.StackCleanerConfiguration.GetHiddenTypes">
-            <returns>A readonly array representing the current hidden types. May equal <see cref="F:StackCleaner.StackTraceCleaner.DefaultHiddenTypes"/> </returns>
+            <returns>A readonly array representing the current hidden types. May equal <see cref="F:StackCleaner.StackTraceCleaner.DefaultHiddenTypes"/>.</returns>
         </member>
         <member name="T:StackCleaner.StackColorFormatType">
             <summary>
@@ -226,6 +226,12 @@
         <member name="P:StackCleaner.ColorConfig.PropertyColor">
             <summary>
             Color of property names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.EventColor">
+            <summary>
+            Color of event names.
             </summary>
             <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
         </member>
@@ -334,6 +340,12 @@
         <member name="P:StackCleaner.Color4Config.PropertyColor">
             <summary>
             Color of property names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.EventColor">
+            <summary>
+            Color of event names.
             </summary>
             <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
         </member>
@@ -452,6 +464,12 @@
         <member name="P:StackCleaner.Color32Config.PropertyColor">
             <summary>
             Color of property names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.EventColor">
+            <summary>
+            Color of event names.
             </summary>
             <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
         </member>
@@ -1037,6 +1055,12 @@
         <member name="P:StackCleaner.UnityColor32Config.PropertyColor">
             <summary>
             Color of property names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.EventColor">
+            <summary>
+            Color of event names.
             </summary>
             <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
         </member>

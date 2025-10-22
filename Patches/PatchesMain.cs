@@ -14,8 +14,6 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;
 using DanielWillett.ReflectionTools.Emit;
-using DanielWillett.ReflectionTools.Formatting;
-using DanielWillett.UITools.Util;
 using Version = System.Version;
 #if CLIENT
 using DevkitServer.API.Multiplayer;
@@ -23,12 +21,15 @@ using DevkitServer.Multiplayer.Cryptography;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
+using DanielWillett.UITools.Util;
+using DanielWillett.ReflectionTools.Formatting;
 #endif
 #if SERVER
 using DevkitServer.Multiplayer.Networking;
 using System.Globalization;
 using DevkitServer.Multiplayer.Cryptography;
 using Unturned.SystemEx;
+using SDG.Framework.Water;
 #endif
 
 
@@ -1173,6 +1174,56 @@ internal static class PatchesMain
         return false;
     }
 #endif
+
+#if SERVER
+    // any volume types work here, since theyre ref types it patches all of them
+    [HarmonyPatch(typeof(LevelVolume<WaterVolume, WaterVolumeManager>), "UpdateEditorVisibility")]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> TranspileVolumeManagerAddVolume(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
+    {
+        TranspileContext ctx = new TranspileContext(method, generator, instructions);
+
+        Label? lastLabel = null;
+        while (ctx.MoveNext())
+        {
+            if (lastLabel.HasValue && (ctx.Instruction.opcode == OpCodes.Ldarg_0 || ctx.Instruction.opcode == OpCodes.Ret))
+            {
+                ctx.EmitAbove(emit =>
+                {
+                    emit.AddLabel(out Label skip)
+                        .Branch(skip)
+                        .MarkLabel(lastLabel);
+                    emit.PopFromStack()
+                        .MarkLabel(skip);
+                    emit.NoOperation();
+                });
+                lastLabel = null;
+            }
+            else if (ctx.Instruction.opcode == OpCodes.Ldfld)
+            {
+                FieldInfo field = (FieldInfo)ctx.Instruction.operand;
+                bool isVolumeColliderField = field.Name.Equals("volumeCollider", StringComparison.Ordinal);
+
+                if (!isVolumeColliderField && !field.Name.Equals("editorGameObject", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                ctx.EmitBelow(emit =>
+                {
+                    emit.Duplicate()
+                        .AddLabel(out Label lbl)
+                        .BranchIfFalse(lbl);
+                    lastLabel = lbl;
+                });
+            }
+        }
+
+        return ctx;
+    }
+#endif
+
     private static bool PatchLevelIncludeHatch(string id, byte[] pendingHash)
     {
         return !DevkitServerModule.IsEditing || !Level.isLoaded;

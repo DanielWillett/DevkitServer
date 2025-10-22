@@ -118,9 +118,19 @@ public static class VanillaCommandInfo
         {
             mode = CommandExecutionMode.Disabled;
         }
+        else if (command.Name.Equals("CommandDestroyDrivenVehicle", StringComparison.Ordinal))
+        {
+            mode = CommandExecutionMode.RequireCheatsEnabled | CommandExecutionMode.RequirePlaying;
+            serverOnly = true;
+        }
         else if (command.Name.Equals("CommandEffectUI", StringComparison.Ordinal))
         {
             mode = CommandExecutionMode.RequirePlaying;
+            serverOnly = true;
+        }
+        else if (command.Name.Equals("CommandEnterAndDestroyNearestVehicle", StringComparison.Ordinal) || command.Name.Equals("CommandExitAndDestroyDrivenVehicle", StringComparison.Ordinal))
+        {
+            mode = CommandExecutionMode.RequireCheatsEnabled | CommandExecutionMode.RequirePlaying;
             serverOnly = true;
         }
         else if (command.Name.Equals("CommandExperience", StringComparison.Ordinal))
@@ -304,6 +314,11 @@ public static class VanillaCommandInfo
             mode = CommandExecutionMode.Always;
             serverOnly = true;
         }
+        else if (command.Name.Equals("CommandRewardList", StringComparison.Ordinal))
+        {
+            serverOnly = true;
+            mode = CommandExecutionMode.RequireCheatsEnabled | CommandExecutionMode.RequirePlaying;
+        }
         else if (command.Name.Equals("CommandSave", StringComparison.Ordinal))
         {
             mode = CommandExecutionMode.NoMenu;
@@ -385,11 +400,6 @@ public static class VanillaCommandInfo
         {
             mode = CommandExecutionMode.RequireMultiplayer;
             dedicatedServerOnly = true;
-        }
-        else if (command.Name.Equals("CommandVehicle", StringComparison.Ordinal))
-        {
-            mode = CommandExecutionMode.RequireCheatsEnabled | CommandExecutionMode.RequirePlaying;
-            serverOnly = true;
         }
         else if (command.Name.Equals("CommandVehicle", StringComparison.Ordinal))
         {

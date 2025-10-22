@@ -98,12 +98,6 @@
             <HintPath>$(SharedManagedPath)\SDG.NetPak.Runtime.dll</HintPath>
             <Private>true</Private>
         </Reference>
-      <!--
-        <Reference Include="SDG.HostBans.Runtime">
-            <HintPath>$(SharedManagedPath)\SDG.HostBans.Runtime.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-      -->
         <Reference Include="SystemEx">
             <HintPath>$(SharedManagedPath)\SystemEx.dll</HintPath>
             <Private>true</Private>
@@ -117,12 +111,6 @@
         </Reference>
 
         <!-- Unity -->
-      <!--
-        <Reference Include="StandardAssets">
-            <HintPath>$(SharedManagedPath)\StandardAssets.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-      -->
         <Reference Include="UnityEngine">
             <HintPath>$(SharedManagedPath)\UnityEngine.dll</HintPath>
             <Private>true</Private>
@@ -151,151 +139,34 @@
             <HintPath>$(SharedManagedPath)\UnityEngine.UnityWebRequestModule.dll</HintPath>
             <Private>true</Private>
         </Reference>
-      <!--
-        <Reference Include="UnityEngine.AccessibilityModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.AccessibilityModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.AIModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.AIModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.AnimationModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.AnimationModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.AudioModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.AudioModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.ClothModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.ClothModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.ClusterInputModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.ClusterInputModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.ClusterRendererModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.ClusterRendererModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.DirectorModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.DirectorModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.GridModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.GridModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.JSONSerializeModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.JSONSerializeModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.LocalizationModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.LocalizationModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.ParticleSystemModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.ParticleSystemModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.Physics2DModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.Physics2DModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.SubstanceModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.SubstanceModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.SubsystemsModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.SubsystemsModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.TerrainPhysicsModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.TerrainPhysicsModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.TilemapModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.TilemapModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.UNETModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.UNETModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.UnityAnalyticsCommonModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.UnityAnalyticsCommonModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.UnityWebRequestAssetBundleModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.UnityWebRequestAssetBundleModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.UnityWebRequestAudioModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.UnityWebRequestAudioModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.UnityWebRequestTextureModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.UnityWebRequestTextureModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.VehiclesModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.VehiclesModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.WindModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.WindModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.WindModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.WindModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-      -->
+      <Reference Include="PackageTools">
+	      <HintPath>$(SharedManagedPath)\PackageTools.dll</HintPath>
+	      <Private>true</Private>
+      </Reference>
+      <Reference Include="Drawing">
+	      <HintPath>$(SharedManagedPath)\Drawing.dll</HintPath>
+	      <Private>true</Private>
+      </Reference>
 
         <!-- Third-Party -->
-      <!--
-        <Reference Include="BattlEye">
-            <HintPath>$(SharedManagedPath)\BattlEye.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-      -->
+
         <Reference Include="HighlightingSystem">
             <HintPath>$(SharedManagedPath)\HighlightingSystem.dll</HintPath>
             <Private>true</Private>
         </Reference>
-      <!--
-        <Reference Include="Mono.Posix">
-            <HintPath>$(SharedManagedPath)\Mono.Posix.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="Mono.Security">
-            <HintPath>$(SharedManagedPath)\Mono.Security.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="Pathfinding.ClipperLib">
-            <HintPath>$(SharedManagedPath)\Pathfinding.ClipperLib.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="Pathfinding.Ionic.Zip.Reduced">
-            <HintPath>$(SharedManagedPath)\Pathfinding.Ionic.Zip.Reduced.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="Pathfinding.JsonFx">
-            <HintPath>$(SharedManagedPath)\Pathfinding.JsonFx.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="Pathfinding.Poly2Tri">
-            <HintPath>$(SharedManagedPath)\Pathfinding.Poly2Tri.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-      -->
 
         <Reference Include="AstarPathfindingProject">
             <HintPath>$(SharedManagedPath)\AstarPathfindingProject.dll</HintPath>
             <Private>true</Private>
         </Reference>
+		<Reference Include="PackageTools">
+			<HintPath>$(SharedManagedPath)\PackageTools.dll</HintPath>
+			<Private>true</Private>
+		</Reference>
+		<Reference Include="Drawing">
+			<HintPath>$(SharedManagedPath)\Drawing.dll</HintPath>
+			<Private>true</Private>
+		</Reference>
     </ItemGroup>
 
     <!-- Server References -->
@@ -312,118 +183,24 @@
             <HintPath>$(SharedManagedPath)\SDG.Glazier.Runtime.dll</HintPath>
             <Private>true</Private>
         </Reference>
-      <!--
-        <Reference Include="Unturned.LiveConfig.Runtime">
-          <HintPath>$(SharedManagedPath)\Unturned.LiveConfig.Runtime.dll</HintPath>
-          <Private>true</Private>
-        </Reference>
-      -->
+
         <!-- Unity -->
 
-      <!--
-        <Reference Include="Unity.TextMeshPro">
-            <HintPath>$(SharedManagedPath)\Unity.TextMeshPro.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-      -->
         <Reference Include="UnityEngine.IMGUIModule">
             <HintPath>$(SharedManagedPath)\UnityEngine.IMGUIModule.dll</HintPath>
             <Private>true</Private>
         </Reference>
-      <!--
-        <Reference Include="UnityEngine.InputModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.InputModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.UI">
-            <HintPath>$(SharedManagedPath)\UnityEngine.UI.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.TextRenderingModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.TextRenderingModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-      -->
+
         <Reference Include="UnityEngine.InputLegacyModule">
             <HintPath>$(SharedManagedPath)\UnityEngine.InputLegacyModule.dll</HintPath>
             <Private>true</Private>
         </Reference>
-      <!--
-        <Reference Include="Unity.Postprocessing.Runtime">
-            <HintPath>$(SharedManagedPath)\Unity.Postprocessing.Runtime.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.ARModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.ARModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.NVIDIAModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.NVIDIAModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.ScreenCaptureModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.ScreenCaptureModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.SpriteMaskModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.SpriteMaskModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.SpriteShapeModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.SpriteShapeModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.StreamingModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.StreamingModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.TextCoreFontEngineModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.TextCoreFontEngineModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.TextCoreModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.TextCoreModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.TextCoreTextEngineModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.TextCoreTextEngineModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-      -->
+
         <Reference Include="UnityEngine.TextRenderingModule">
             <HintPath>$(SharedManagedPath)\UnityEngine.TextRenderingModule.dll</HintPath>
             <Private>true</Private>
         </Reference>
-      <!--
-        <Reference Include="UnityEngine.UIElementsModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.UIElementsModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.UIModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.UIModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.VFXModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.VFXModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.VideoModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.VideoModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.VirtualTexturingModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.VirtualTexturingModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.VRModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.VRModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-        <Reference Include="UnityEngine.XRModule">
-            <HintPath>$(SharedManagedPath)\UnityEngine.XRModule.dll</HintPath>
-            <Private>true</Private>
-        </Reference>
-      -->
+
       
     </ItemGroup>
 

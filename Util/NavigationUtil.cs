@@ -9,6 +9,9 @@ using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players;
 using Pathfinding;
+using Pathfinding.Graphs.Navmesh;
+using Pathfinding.Util;
+using Guid = System.Guid;
 #if SERVER
 using DevkitServer.API.UI;
 #endif
@@ -429,7 +432,7 @@ public static class NavigationUtil
 
         int ct = 27 + sizeof(ushort) * 2 * graph.tileZCount * graph.tileXCount;
 
-        RecastGraph.NavmeshTile[] tiles = graph.GetTiles();
+        NavmeshTile[] tiles = graph.GetTiles();
 
         for (int z = 0; z < graph.tileZCount; ++z)
         {
@@ -437,7 +440,7 @@ public static class NavigationUtil
             {
                 int offset = x + z * graph.tileXCount;
 
-                RecastGraph.NavmeshTile tile = tiles[offset];
+                NavmeshTile tile = tiles[offset];
 
                 ct += tile.tris.Length * sizeof(ushort);
                 ct += tile.verts.Length * sizeof(int) * 3;
@@ -455,7 +458,7 @@ public static class NavigationUtil
     {
         ThreadUtil.assertIsGameThread();
 
-        const byte version = 0;
+        const byte version = 1;
 
         writer.Write(version);
 
@@ -464,7 +467,7 @@ public static class NavigationUtil
         writer.Write((byte)graph.tileXCount);
         writer.Write((byte)graph.tileZCount);
 
-        RecastGraph.NavmeshTile[] tiles = graph.GetTiles();
+        NavmeshTile[] tiles = graph.GetTiles();
 
         for (int z = 0; z < graph.tileZCount; ++z)
         {
@@ -472,16 +475,18 @@ public static class NavigationUtil
             {
                 int offset = x + z * graph.tileXCount;
 
-                RecastGraph.NavmeshTile tile = tiles[offset];
+                NavmeshTile tile = tiles[offset];
 
                 writer.Write((ushort)tile.tris.Length);
                 for (int i = 0; i < tile.tris.Length; ++i)
+                {
                     writer.Write((ushort)tile.tris[i]);
+                }
                 
                 writer.Write((ushort)tile.verts.Length);
                 for (int i = 0; i < tile.verts.Length; ++i)
                 {
-                    Int3 vert = tile.verts[i];
+                    ref Int3 vert = ref tile.verts[i];
                     writer.Write(vert.x);
                     writer.Write(vert.y);
                     writer.Write(vert.z);
@@ -498,78 +503,57 @@ public static class NavigationUtil
     {
         ThreadUtil.assertIsGameThread();
 
-        AstarPath.active.BlockUntilPathQueueBlocked();
-
         reader.ReadUInt8(); // version
 
-        TriangleMeshNode.SetNavmeshHolder((int)graph.graphIndex, graph);
-
-        uint graphIndex = (uint)AstarPath.active.astarData.GetGraphIndex(graph);
-
-        graph.forcedBoundsCenter = reader.ReadVector3();
-        graph.forcedBoundsSize = reader.ReadVector3();
-        graph.tileXCount = reader.ReadUInt8();
-        graph.tileZCount = reader.ReadUInt8();
-
-        RecastGraph.NavmeshTile[] tiles = new RecastGraph.NavmeshTile[graph.tileXCount * graph.tileZCount];
-        graph.SetTiles(tiles);
-
-        for (int z = 0; z < graph.tileZCount; ++z)
+        PathProcessor.GraphUpdateLock gLock = AstarPath.active.PausePathfinding();
+        try
         {
-            for (int x = 0; x < graph.tileXCount; ++x)
+            TriangleMeshNode.SetNavmeshHolder((int)graph.graphIndex, graph);
+
+            graph.forcedBoundsCenter = reader.ReadVector3();
+            graph.forcedBoundsSize = reader.ReadVector3();
+            graph.tileXCount = reader.ReadUInt8();
+            graph.tileZCount = reader.ReadUInt8();
+            GraphTransform transform = graph.CalculateTransform();
+
+            TileMeshes meshes = new TileMeshes
             {
-                RecastGraph.NavmeshTile tile = new RecastGraph.NavmeshTile
+                tileMeshes = new TileMesh[graph.tileXCount * graph.tileZCount],
+                tileRect = new IntRect(0, 0, graph.tileXCount - 1, graph.tileZCount - 1),
+                tileWorldSize = new Vector2(graph.TileWorldSizeX, graph.TileWorldSizeZ)
+            };
+
+            for (int z = 0; z < graph.tileZCount; ++z)
+            {
+                for (int x = 0; x < graph.tileXCount; ++x)
                 {
-                    x = x,
-                    z = z,
-                    w = 1,
-                    d = 1
-                };
+                    TileMesh mesh = new TileMesh();
+                    int triCt = reader.ReadUInt16();
+                    mesh.triangles = new int[triCt];
+                    for (int i = 0; i < triCt; ++i)
+                        mesh.triangles[i] = reader.ReadUInt16();
 
-                graph.bbTree = new BBTree(graph);
-                
-                int offset = x + z * graph.tileXCount;
-                tiles[offset] = tile;
+                    int vertCt = reader.ReadUInt16();
+                    mesh.verticesInTileSpace = new Int3[vertCt];
+                    for (int i = 0; i < vertCt; ++i)
+                    {
+                        Int3 point = new Int3(reader.ReadInt32(), reader.ReadInt32(), reader.ReadInt32());
+                        Int3 absolutePosition = transform.InverseTransform(point);
+                        Int3 relativeOffset = (Int3)new Vector3(graph.TileWorldSizeX * x, 0.0f, graph.TileWorldSizeZ * z);
+                        mesh.verticesInTileSpace[i] = absolutePosition - relativeOffset;
+                    }
 
-                tile.tris = new int[reader.ReadUInt16()];
-                for (int i = 0; i < tile.tris.Length; ++i)
-                    tile.tris[i] = reader.ReadUInt16();
-
-                tile.verts = new Int3[reader.ReadUInt16()];
-                for (int i = 0; i < tile.verts.Length; ++i)
-                    tile.verts[i] = new Int3(reader.ReadInt32(), reader.ReadInt32(), reader.ReadInt32());
-
-                tile.nodes = new TriangleMeshNode[tile.tris.Length / 3];
-
-                int offsetBits = offset << 12;
-
-                for (int i = 0; i < tile.nodes.Length; ++i)
-                {
-                    TriangleMeshNode node = new TriangleMeshNode(AstarPath.active);
-                    tile.nodes[i] = node;
-
-                    node.GraphIndex = graphIndex;
-                    node.Penalty = 0u;
-                    node.Walkable = true;
-                    node.v0 = tile.tris[i * 3] | offsetBits;
-                    node.v1 = tile.tris[i * 3 + 1] | offsetBits;
-                    node.v2 = tile.tris[i * 3 + 2] | offsetBits;
-                    
-                    node.UpdatePositionFromVertices();
-                    graph.bbTree.Insert(node);
+                    mesh.tags = new uint[mesh.triangles.Length];
+                    int offset = x + z * graph.tileXCount;
+                    meshes.tileMeshes[offset] = mesh;
                 }
-
-                graph.CreateNodeConnections(tile.nodes);
             }
+
+            graph.ReplaceTiles(meshes);
         }
-
-        for (int z = 0; z < graph.tileZCount; ++z)
+        finally
         {
-            for (int x = 0; x < graph.tileXCount; ++x)
-            {
-                int offset = x + z * graph.tileXCount;
-                graph.ConnectTileWithNeighbours(tiles[offset]);
-            }
+            gLock.Release();
         }
     }
 

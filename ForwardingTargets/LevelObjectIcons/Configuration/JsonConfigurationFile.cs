@@ -1,8 +1,7 @@
-﻿extern alias NSJ;
-using DevkitServer.API.Logging;
+﻿using DevkitServer.API.Logging;
 using DevkitServer.Configuration;
 using DevkitServer.Util;
-using NSJ::Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Text.Json;
 
@@ -53,8 +52,8 @@ internal class InternalJsonConfigWrapper<TConfig> : DevkitServer.API.JsonConfigu
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Exception in {nameof(OnReload).Colorize(ConsoleColor.White)} after reading {typeof(TConfig).Format()} config at {File.Format(false)}.", method: "JSON CONFIG");
-            Logger.LogError(ex, method: "JSON CONFIG");
+            LOILogger.Logger.LogError("JSON CONFIG", $"Exception in {nameof(OnReload).Colorize(ConsoleColor.White)} after reading {typeof(TConfig).Format()} config at {File.Format(false)}.");
+            LOILogger.Logger.LogError("JSON CONFIG", ex);
         }
     }
 }

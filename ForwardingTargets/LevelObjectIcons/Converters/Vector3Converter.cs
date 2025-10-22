@@ -1,5 +1,4 @@
-﻿extern alias NSJ;
-using NSJ::Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Globalization;
 using UnityEngine;

@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
-  <!-- ReSharper disable ResxNotResolved -->
   <!-- 
     Microsoft ResX Schema 
     
@@ -128,12 +127,6 @@
   <data name="Lib.Harmony.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\Lib.Harmony\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="netstandard" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\.NET Standard 2.1\netstandard.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="netstandard.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\.NET Standard 2.1\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
   <data name="DanielWillett.StackCleaner" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\DanielWillett.StackCleaner\DanielWillett.StackCleaner.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
@@ -197,35 +190,11 @@
   <data name="System.Buffers.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.Buffers\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="System.IO.Compression" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\System.IO.Compression\System.IO.Compression.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="System.IO.Compression.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\System.IO.Compression\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="System.IO.Compression.FileSystem" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\System.IO.Compression.FileSystem\System.IO.Compression.FileSystem.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="System.IO.Compression.FileSystem.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\System.IO.Compression.FileSystem\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="System.Memory" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\System.Memory\System.Memory.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="System.Memory.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\System.Memory\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
   <data name="System.Numerics.Vectors" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.Numerics.Vectors\System.Numerics.Vectors.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="System.Numerics.Vectors.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.Numerics.Vectors\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="System.Runtime.CompilerServices.Unsafe" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\System.Runtime.CompilerServices.Unsafe\System.Runtime.CompilerServices.Unsafe.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="System.Runtime.CompilerServices.Unsafe.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\System.Runtime.CompilerServices.Unsafe\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="System.Text.Encodings.Web" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.Text.Encodings.Web\System.Text.Encodings.Web.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
@@ -335,5 +304,4 @@
   <data name="cartography_config" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Defaults\cartography_config.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <!-- ReSharper restore ResxNotResolved -->
 </root>

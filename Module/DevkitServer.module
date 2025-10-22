@@ -12,11 +12,6 @@
 	"Assemblies":
 	[
 		{
-			"Path": "/Libraries/.NET Standard 2.1/netstandard.dll",
-			"Role": "Both_Optional",
-			"Load_As_Byte_Array": false
-		},
-		{
 			"Path": "/Libraries/Lib.Harmony/0Harmony.dll",
 			"Role": "Both_Optional",
 			"Load_As_Byte_Array": false

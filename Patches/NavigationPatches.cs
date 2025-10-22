@@ -21,7 +21,6 @@ using DevkitServer.Multiplayer.Sync;
 #if SERVER
 using Cysharp.Threading.Tasks;
 using DevkitServer.Players;
-using Pathfinding.Voxels;
 using System.Diagnostics;
 using System.Globalization;
 #endif
@@ -93,33 +92,17 @@ internal static class NavigationPatches
     [UsedImplicitly]
     private static IEnumerable<CodeInstruction> TranspileBakeNavigation(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
     {
-        MethodInfo? originalMethod = typeof(AstarPath).GetMethod(nameof(AstarPath.ScanSpecific),
+        MethodInfo? originalMethod = typeof(AstarPath).GetMethod(nameof(AstarPath.Scan),
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, [ typeof(NavGraph) ],
             null);
         if (originalMethod == null)
         {
             Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: " +
-                                                   FormattingUtil.FormatMethod(typeof(void), typeof(AstarPath), nameof(AstarPath.ScanSpecific),
+                                                   FormattingUtil.FormatMethod(typeof(void), typeof(AstarPath), nameof(AstarPath.Scan),
                                                        [ (typeof(NavGraph), "graph") ]) + ".");
         }
 
-        MethodInfo? replacementMethod = typeof(AstarPath).GetMethod(nameof(AstarPath.ScanSpecific),
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, [ typeof(NavGraph), typeof(OnScanStatus) ],
-            null);
-        if (replacementMethod == null)
-        {
-            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: " +
-                                                   FormattingUtil.FormatMethod(typeof(void), typeof(AstarPath), nameof(AstarPath.ScanSpecific),
-                                                       [ (typeof(NavGraph), "graph"), (typeof(OnScanStatus), "statusCallback") ]) + ".");
-        }
-
-        ConstructorInfo? delegateConstructor = typeof(OnScanStatus)
-            .GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            .FirstOrDefault(x => x.GetParameters() is [ { ParameterType.IsValueType: false }, _ ] p && p[1].ParameterType == typeof(nint));
-        if (delegateConstructor == null)
-        {
-            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find constructor for {typeof(OnScanStatus).Format()}.");
-        }
+        MethodInfo replacementMethod = Accessor.GetMethod(ScanAndListen)!;
 
         List<CodeInstruction> ins = instructions.ToList();
 
@@ -145,17 +128,14 @@ internal static class NavigationPatches
         ins[9].labels.Add(lbl2);
 #endif
 
-        if (replacementMethod != null && originalMethod != null && delegateConstructor != null)
+        if (originalMethod != null)
         {
             for (int i = 4; i < ins.Count; ++i)
             {
                 if (!ins[i].Calls(originalMethod))
                     continue;
 
-                ins.Insert(i, new CodeInstruction(OpCodes.Ldnull).MoveLabelsFrom(ins[i]));
-                ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldftn, Accessor.GetMethod(OnBakeNavigationProgressUpdate)));
-                ins.Insert(i + 2, new CodeInstruction(OpCodes.Newobj, delegateConstructor));
-                ins[i + 3] = new CodeInstruction(replacementMethod.GetCallRuntime(), replacementMethod);
+                ins[i] = new CodeInstruction(replacementMethod.GetCallRuntime(), replacementMethod);
                 patched = true;
             }
         }
@@ -168,21 +148,26 @@ internal static class NavigationPatches
         return ins;
     }
 
-#if SERVER
-
-    // Makes the server still ping clients while building the nav mesh to keep them from being kicked.
-    // I'm basing it on Time.deltaTime to keep anything using it for timing as accurate as possible.
-
-    [HarmonyPatch(typeof(RecastGraph), "BuildTileMesh")]
-    [HarmonyPostfix]
-    [UsedImplicitly]
-    private static void BuildTileMeshPostfix(Voxelize vox, int x, int z)
+    private static void ScanAndListen(AstarPath activePath, RecastGraph graph)
     {
-        if (x == 0 && z == 0)
-            _lastListen = DateTime.UtcNow;
-        else if ((DateTime.UtcNow - _lastListen).TotalSeconds > CachedTime.DeltaTime && CallListen != null)
-            CallListen.Invoke();
+        IEnumerable<Progress> progress = activePath.ScanAsync(graph);
+        bool hasListened = false;
+        foreach (Progress p in progress)
+        {
+            OnBakeNavigationProgressUpdate(p);
+#if SERVER
+            // Makes the server still ping clients while building the nav mesh to keep them from being kicked.
+            // I'm basing it on Time.deltaTime to keep anything using it for timing as accurate as possible.
+
+            if (!hasListened)
+                _lastListen = DateTime.UtcNow;
+            else if ((DateTime.UtcNow - _lastListen).TotalSeconds > CachedTime.DeltaTime && CallListen != null)
+                CallListen.Invoke();
+#endif
+        }
     }
+
+#if SERVER
 
     [NetCall(NetCallSource.FromClient, DevkitServerNetCall.SendBakeNavRequest)]
     private static void ReceiveBakeNavRequest(MessageContext ctx, NetId netId)
@@ -277,18 +262,29 @@ internal static class NavigationPatches
 
     private static void OnBakeNavigationProgressUpdate(Progress progress)
     {
-        Logger.DevkitServer.LogInfo(Source, $"[A* PATHFINDING] ({progress.progress.Format("P")}) {progress.description.Colorize(ConsoleColor.Gray)}.");
-#if SERVER       
+        string description = progress.ToString();
+        Logger.DevkitServer.LogInfo(Source, $"[A* PATHFINDING] ({progress.progress.Format("P")}) {description.Colorize(ConsoleColor.Gray)}.");
+#if SERVER
+
+        // remove "'XX% ' ..." prefix
+        string descriptionWithoutPercent;
+        int pInd = description.IndexOf('%');
+        if (pInd >= 0 && pInd < description.Length - 1 && description[pInd + 1] == ' ')
+            ++pInd;
+        if (pInd >= 0 && pInd < description.Length - 1)
+            descriptionWithoutPercent = description[(pInd + 1)..];
+        else descriptionWithoutPercent = description;
+
         if (Provider.clients.Count > 0 && _baking != null && _baking.TryGetIndex(out byte nav) && NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
         {
             float progressPercentage;
-            if (progress.description.StartsWith("Building Tile ", StringComparison.Ordinal))
+            if (descriptionWithoutPercent.StartsWith("Scanning graph ", StringComparison.Ordinal))
             {
                 _hasStartedBakingTiles = true;
-                int i1 = progress.description.IndexOf('/', 14);
+                int i1 = descriptionWithoutPercent.IndexOf(" of ", 15, StringComparison.OrdinalIgnoreCase);
                 if (i1 == -1 ||
-                    !int.TryParse(progress.description.Substring(14, i1 - 14), NumberStyles.Number, CultureInfo.InvariantCulture, out int partialSmall) ||
-                    !int.TryParse(progress.description.Substring(i1 + 1), NumberStyles.Number, CultureInfo.InvariantCulture, out int partialLarge))
+                    !int.TryParse(descriptionWithoutPercent.AsSpan(15, i1 - 15), NumberStyles.Number, CultureInfo.InvariantCulture, out int partialSmall) ||
+                    !int.TryParse(descriptionWithoutPercent.AsSpan(i1 + 4), NumberStyles.Number, CultureInfo.InvariantCulture, out int partialLarge))
                     progressPercentage = 0.5f;
                 else
                     progressPercentage = ((float)partialSmall / partialLarge) * 0.8f + 0.1f;
@@ -297,7 +293,7 @@ internal static class NavigationPatches
                 progressPercentage = 0.9f + progress.progress / 10f;
             else
                 progressPercentage = progress.progress / 10f;
-            SendNavBakeProgressUpdate.Invoke(Provider.GatherClientConnections(), netId, progressPercentage, progress.description, true);
+            SendNavBakeProgressUpdate.Invoke(Provider.GatherClientConnections(), netId, progressPercentage, description, true);
         }
 #endif
     }

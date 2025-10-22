@@ -83,8 +83,8 @@
     <Compile Remove="packages\**" />
     <Compile Remove="TestPlugin\**" />
     <Compile Remove="Common.targets" />
-		<Compile Remove="obj\**" />
-		<Compile Remove="bin\**" />
+	<Compile Remove="obj\**" />
+	<Compile Remove="bin\**" />
     <EmbeddedResource Remove="DevkitServer.Launcher\**" />
     <EmbeddedResource Remove="DevkitServer.Resources\**" />
     <EmbeddedResource Remove="DevkitServer.Tests\**" />
@@ -94,8 +94,8 @@
     <EmbeddedResource Remove="packages\**" />
     <EmbeddedResource Remove="TestPlugin\**" />
     <EmbeddedResource Remove="Common.targets" />
-		<EmbeddedResource Remove="obj\**" />
-		<EmbeddedResource Remove="bin\**" />
+	<EmbeddedResource Remove="obj\**" />
+	<EmbeddedResource Remove="bin\**" />
     <None Remove="DevkitServer.Launcher\**" />
     <None Remove="DevkitServer.Resources\**" />
     <None Remove="DevkitServer.Tests\**" />
