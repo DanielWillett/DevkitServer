@@ -6,6 +6,8 @@ using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
 using SDG.NetPak;
 using System.Globalization;
+using Pathfinding;
+using Path = System.IO.Path;
 #if CLIENT
 using DanielWillett.UITools;
 using DevkitServer.Core.UI.Extensions;
@@ -382,7 +384,16 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             Buffer = Buffer
         };
 
-        _bufferLen = NavigationUtil.CalculateTotalWriteSize(flag.graph);
+        UnturnedNavmesh_ASPFP? navmesh = flag.navmeshInterface as UnturnedNavmesh_ASPFP;
+        if (navmesh != null)
+        {
+            _bufferLen = 1 + NavigationUtil.CalculateTotalWriteSize(navmesh.graph);
+        }
+        else
+        {
+            _bufferLen = 1;
+        }
+
         _ttlPackets = (int)Math.Ceiling(_bufferLen / (double)MaxPacketSize);
 
         writer.Write(HeaderSize);
@@ -393,7 +404,16 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             writer.WriteBlock(0, HeaderSize - writer.Count);
 
 
-        NavigationUtil.WriteRecastGraphData(writer, flag.graph);
+        if (navmesh != null)
+        {
+            writer.Write(true);
+            NavigationUtil.WriteRecastGraphData(writer, navmesh.graph);
+        }
+        else
+        {
+            writer.Write(false);
+        }
+
         Logger.DevkitServer.LogDebug(Source, $" Buffered {FormattingUtil.FormatCapacity(_bufferLen - HeaderSize, colorize: true)}. Total packets: {_ttlPackets.Format()}.");
 
         _fs!.Flush();
@@ -420,7 +440,20 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             }
 
             Flag flag = flags[nav];
-            NavigationUtil.ReadRecastGraphDataTo(reader, flag.graph);
+            if (reader.ReadBool())
+            {
+                RecastGraph? graph = (flag.navmeshInterface as UnturnedNavmesh_ASPFP)?.graph;
+                if (graph != null)
+                {
+                    AstarPath.active.AddWorkItem(() => NavigationUtil.ReadRecastGraphDataTo(reader, graph));
+                    AstarPath.active.FlushWorkItems();
+                }
+                else
+                {
+                    NavigationUtil.ReadRecastGraphDataTo(reader, null);
+                }
+            }
+
             flag.UpdateEditorNavmesh();
 
 #if CLIENT

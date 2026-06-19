@@ -1,5 +1,4 @@
 using DanielWillett.ReflectionTools;
-using DanielWillett.ReflectionTools.Emit;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 using DevkitServer.API.UI;
@@ -17,6 +16,7 @@ using DevkitServer.API;
 using DevkitServer.Core.UI.Extensions;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Sync;
+using DanielWillett.ReflectionTools.Emit;
 #endif
 #if SERVER
 using Cysharp.Threading.Tasks;
@@ -92,14 +92,15 @@ internal static class NavigationPatches
     [UsedImplicitly]
     private static IEnumerable<CodeInstruction> TranspileBakeNavigation(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
     {
-        MethodInfo? originalMethod = typeof(AstarPath).GetMethod(nameof(AstarPath.Scan),
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, [ typeof(NavGraph) ],
+        MethodInfo? originalMethod = typeof(IUnturnedPerNavmeshEditorInterface).GetMethod(nameof(IUnturnedPerNavmeshEditorInterface.Bake),
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes,
             null);
         if (originalMethod == null)
         {
             Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: " +
-                                                   FormattingUtil.FormatMethod(typeof(void), typeof(AstarPath), nameof(AstarPath.Scan),
-                                                       [ (typeof(NavGraph), "graph") ]) + ".");
+                                                   FormattingUtil.FormatMethod(
+                                                       typeof(void), typeof(IUnturnedPerNavmeshEditorInterface), nameof(IUnturnedPerNavmeshEditorInterface.Bake), []) + "."
+                                                   );
         }
 
         MethodInfo replacementMethod = Accessor.GetMethod(ScanAndListen)!;
@@ -136,6 +137,7 @@ internal static class NavigationPatches
                     continue;
 
                 ins[i] = new CodeInstruction(replacementMethod.GetCallRuntime(), replacementMethod);
+                ins.Insert(i, new CodeInstruction(OpCodes.Ldarg_0)); // load this (goes before last one)
                 patched = true;
             }
         }
@@ -148,9 +150,15 @@ internal static class NavigationPatches
         return ins;
     }
 
-    private static void ScanAndListen(AstarPath activePath, RecastGraph graph)
+    private static void ScanAndListen(IUnturnedPerNavmeshEditorInterface navmeshInstance, Flag flag)
     {
-        IEnumerable<Progress> progress = activePath.ScanAsync(graph);
+        if (navmeshInstance is not UnturnedNavmeshFlag_ASPFP || flag.navmeshInterface is not UnturnedNavmesh_ASPFP navmesh)
+        {
+            navmeshInstance.Bake();
+            return;
+        }
+
+        IEnumerable<Progress> progress = AstarPath.active.ScanAsync(navmesh.graph);
         bool hasListened = false;
         foreach (Progress p in progress)
         {
@@ -160,9 +168,15 @@ internal static class NavigationPatches
             // I'm basing it on Time.deltaTime to keep anything using it for timing as accurate as possible.
 
             if (!hasListened)
+            {
                 _lastListen = DateTime.UtcNow;
+                hasListened = true;
+            }
             else if ((DateTime.UtcNow - _lastListen).TotalSeconds > CachedTime.DeltaTime && CallListen != null)
+            {
                 CallListen.Invoke();
+                hasListened = false;
+            }
 #endif
         }
     }

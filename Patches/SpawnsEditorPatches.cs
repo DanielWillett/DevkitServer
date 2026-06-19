@@ -609,7 +609,7 @@ internal static class SpawnsEditorPatches
     [HarmonyPrefix]
     [UsedImplicitly]
     [HarmonyPriority(-1)]
-    private static bool OnAnimalColorUpdated(ISleekUInt16Field field, ushort state)
+    private static bool OnAnimalTableIdUpdated(ISleekUInt16Field field, ushort state)
     {
         if (!OnTableIdUpdated(state, EditorSpawns.selectedAnimal, SpawnType.Animal))
             field.Value = LevelAnimals.tables[EditorSpawns.selectedAnimal].tableID;
@@ -621,7 +621,7 @@ internal static class SpawnsEditorPatches
     [HarmonyPrefix]
     [UsedImplicitly]
     [HarmonyPriority(-1)]
-    private static bool OnVehicleColorUpdated(ISleekUInt16Field field, ushort state)
+    private static bool OnVehicleTableIdUpdated(ISleekUInt16Field field, ushort state)
     {
         if (!OnTableIdUpdated(state, EditorSpawns.selectedVehicle, SpawnType.Vehicle))
             field.Value = LevelVehicles.tables[EditorSpawns.selectedVehicle].tableID;
@@ -633,7 +633,7 @@ internal static class SpawnsEditorPatches
     [HarmonyPrefix]
     [UsedImplicitly]
     [HarmonyPriority(-1)]
-    private static bool OnItemColorUpdated(ISleekUInt16Field field, ushort state)
+    private static bool OnItemTableIdUpdated(ISleekUInt16Field field, ushort state)
     {
         if (!OnTableIdUpdated(state, EditorSpawns.selectedItem, SpawnType.Item))
             field.Value = LevelItems.tables[EditorSpawns.selectedItem].tableID;
@@ -645,7 +645,7 @@ internal static class SpawnsEditorPatches
     [HarmonyPrefix]
     [UsedImplicitly]
     [HarmonyPriority(-1)]
-    private static bool OnZombieColorUpdated(ISleekUInt16Field field, ushort state)
+    private static bool OnZombieTableIdUpdated(ISleekUInt16Field field, ushort state)
     {
         if (!OnTableIdUpdated(state, EditorSpawns.selectedZombie, SpawnType.Zombie))
             field.Value = LevelZombies.tables[EditorSpawns.selectedZombie].lootID;

@@ -229,6 +229,29 @@ internal static class CommandTests
                     return;
                 }
             }
+            else if (Level.isEditor)
+            {
+                bool any = false;
+                foreach (GameObject obj in EditorObjects.EnumerateSelectedGameObjects())
+                {
+                    LevelObject? lvlObj = LevelObjectUtil.FindObject(obj.transform);
+                    if (lvlObj == null)
+                        continue;
+
+                    string dir = Path.Combine(DevkitServerConfig.Directory, "AssetExports", "Selection", lvlObj.instanceID.ToString());
+                    if (Directory.Exists(dir))
+                        Directory.Delete(dir, true);
+                    Directory.CreateDirectory(dir);
+
+                    if (Grabber.Save<Object>(obj, dir))
+                        ctx.ReplyString("Saved <#ddd>" + lvlObj.asset?.objectName + "</color> (<#ddd>" + lvlObj.instanceID + "</color>) to <#fff>" + dir + "</color>.");
+                    else
+                        ctx.ReplyString($"<#ffae3d>Couldn't save {lvlObj.instanceID}.");
+                }
+
+                if (any)
+                    return;
+            }
             if (Physics.Raycast(UserControl.GetLocalLookRay(), out RaycastHit hit, 8192f, unchecked((int)0xFFFFFFFF), QueryTriggerInteraction.Ignore))
             {
                 string dir = Path.Combine(DevkitServerConfig.Directory, "AssetExports", "Look", hit.transform.name);
@@ -243,6 +266,7 @@ internal static class CommandTests
                 return;
             }
         }
+
         if (ctx.HasArgsExact(1) && ctx.TryGet(0, out string resourcePath))
         {
             string actualPath = Path.Combine(DevkitServerConfig.Directory, "AssetExports", "Unity Resources", resourcePath);

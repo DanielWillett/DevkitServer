@@ -35,7 +35,7 @@ public static class NavigationUtil
 #endif
 
     private static readonly StaticGetter<List<Flag>> GetNavigationFlags = Accessor.GenerateStaticGetter<LevelNavigation, List<Flag>>("flags", throwOnError: true)!;
-    private static readonly Action<Flag>? UpdateNavmesh = Accessor.GenerateInstanceCaller<Flag, Action<Flag>>("updateNavmesh", false);
+    private static readonly Action<UnturnedNavmeshFlag_ASPFP>? UpdateNavmesh = Accessor.GenerateInstanceCaller<UnturnedNavmeshFlag_ASPFP, Action<UnturnedNavmeshFlag_ASPFP>>("UpdateVisualMesh", false);
 
     private static readonly CachedMulticastEvent<FlagArgs> EventOnFlagAdded = new CachedMulticastEvent<FlagArgs>(typeof(NavigationUtil), nameof(OnFlagAdded));
     private static readonly CachedMulticastEvent<FlagArgs> EventOnFlagRemoved = new CachedMulticastEvent<FlagArgs>(typeof(NavigationUtil), nameof(OnFlagRemoved));
@@ -303,10 +303,10 @@ public static class NavigationUtil
     {
         ThreadUtil.assertIsGameThread();
 
-        if (UpdateNavmesh == null)
+        if (UpdateNavmesh == null || flag.EditorFlagInterface is not UnturnedNavmeshFlag_ASPFP editorFlag)
             return false;
 
-        UpdateNavmesh(flag);
+        UpdateNavmesh(editorFlag);
         return true;
     }
 
@@ -496,65 +496,88 @@ public static class NavigationUtil
     }
 
     /// <summary>
-    /// Read graph data to an existing recast graph from a <see cref="ByteReader"/>.
+    /// Read graph data to an existing recast graph from a <see cref="ByteReader"/>. If <paramref name="graph"/> is <see langword="null"/> the data will be skipped.
     /// </summary>
     /// <remarks>Does the same thing as <see cref="LevelNavigation.buildGraph"/>.</remarks>
-    public static void ReadRecastGraphDataTo(ByteReader reader, RecastGraph graph)
+    public static void ReadRecastGraphDataTo(ByteReader reader, RecastGraph? graph)
     {
         ThreadUtil.assertIsGameThread();
 
         reader.ReadUInt8(); // version
 
-        PathProcessor.GraphUpdateLock gLock = AstarPath.active.PausePathfinding();
-        try
+        //PathProcessor.GraphUpdateLock gLock = graph == null ? default : AstarPath.active.PausePathfinding();
+        //try
+        //{
+        byte xCt, zCt;
+        GraphTransform? transform;
+        TileMeshes meshes;
+        if (graph != null)
         {
             TriangleMeshNode.SetNavmeshHolder((int)graph.graphIndex, graph);
-
             graph.forcedBoundsCenter = reader.ReadVector3();
             graph.forcedBoundsSize = reader.ReadVector3();
-            graph.tileXCount = reader.ReadUInt8();
-            graph.tileZCount = reader.ReadUInt8();
-            GraphTransform transform = graph.CalculateTransform();
+            graph.tileXCount = xCt = reader.ReadUInt8();
+            graph.tileZCount = zCt = reader.ReadUInt8();
 
-            TileMeshes meshes = new TileMeshes
+            transform = graph.CalculateTransform();
+
+            meshes = new TileMeshes
             {
                 tileMeshes = new TileMesh[graph.tileXCount * graph.tileZCount],
                 tileRect = new IntRect(0, 0, graph.tileXCount - 1, graph.tileZCount - 1),
                 tileWorldSize = new Vector2(graph.TileWorldSizeX, graph.TileWorldSizeZ)
             };
 
-            for (int z = 0; z < graph.tileZCount; ++z)
-            {
-                for (int x = 0; x < graph.tileXCount; ++x)
-                {
-                    TileMesh mesh = new TileMesh();
-                    int triCt = reader.ReadUInt16();
-                    mesh.triangles = new int[triCt];
-                    for (int i = 0; i < triCt; ++i)
-                        mesh.triangles[i] = reader.ReadUInt16();
+        }
+        else
+        {
+            _ = reader.ReadVector3();
+            _ = reader.ReadVector3();
+            xCt = reader.ReadUInt8();
+            zCt = reader.ReadUInt8();
+            meshes = default;
+            transform = null;
+        }
 
-                    int vertCt = reader.ReadUInt16();
-                    mesh.verticesInTileSpace = new Int3[vertCt];
-                    for (int i = 0; i < vertCt; ++i)
+        for (int z = 0; z < zCt; ++z)
+        {
+            for (int x = 0; x < xCt; ++x)
+            {
+                TileMesh mesh = new TileMesh();
+                int triCt = reader.ReadUInt16();
+                mesh.triangles = new int[triCt];
+                for (int i = 0; i < triCt; ++i)
+                    mesh.triangles[i] = reader.ReadUInt16();
+
+                int vertCt = reader.ReadUInt16();
+                mesh.verticesInTileSpace = new Int3[vertCt];
+                for (int i = 0; i < vertCt; ++i)
+                {
+                    Int3 point = new Int3(reader.ReadInt32(), reader.ReadInt32(), reader.ReadInt32());
+                    if (graph != null)
                     {
-                        Int3 point = new Int3(reader.ReadInt32(), reader.ReadInt32(), reader.ReadInt32());
-                        Int3 absolutePosition = transform.InverseTransform(point);
+                        Int3 absolutePosition = transform!.InverseTransform(point);
                         Int3 relativeOffset = (Int3)new Vector3(graph.TileWorldSizeX * x, 0.0f, graph.TileWorldSizeZ * z);
                         mesh.verticesInTileSpace[i] = absolutePosition - relativeOffset;
                     }
-
-                    mesh.tags = new uint[mesh.triangles.Length];
-                    int offset = x + z * graph.tileXCount;
-                    meshes.tileMeshes[offset] = mesh;
                 }
-            }
 
-            graph.ReplaceTiles(meshes);
+                if (graph == null)
+                    continue;
+
+                mesh.tags = new uint[mesh.triangles.Length];
+                int offset = x + z * graph.tileXCount;
+                meshes.tileMeshes![offset] = mesh;
+            }
         }
-        finally
-        {
-            gLock.Release();
-        }
+
+        graph?.ReplaceTiles(meshes);
+        //}
+        //finally
+        //{
+        //    if (graph != null)
+        //        gLock.Release();
+        //}
     }
 
 

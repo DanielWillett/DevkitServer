@@ -441,7 +441,8 @@ public sealed class DevkitServerModule : IModuleNexus
             Provider.onEnemyConnected += UserManager.OnAccepted;
             Provider.onServerDisconnected += UserManager.RemoveUser;
 
-            GameObject? editor = (GameObject?)Resources.Load("Edit/Editor");
+            // ReSharper disable once Unity.UnknownResource (not applicable)
+            GameObject? editor = (GameObject?)Resources.Load("Edit_NoRedist/Editor");
             if (editor != null)
             {
                 Component comp = editor.GetComponentInChildren(AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"));

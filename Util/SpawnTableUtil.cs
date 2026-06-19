@@ -3398,8 +3398,8 @@ public static class SpawnTableUtil
         }
 
         EventOnSpawnTableSpawnAssetUpdated.TryInvoke(spawnType, index);
-        Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set {spawnType.GetLowercaseText()} " +
-                                                                          $"spawn table (# {index.Format()}) asset ID to {id.Format()}.");
+        Logger.DevkitServer.LogConditional(nameof(SetSpawnTableSpawnAssetLocal), $"Set {spawnType.GetLowercaseText()} " +
+                                                                                 $"spawn table (# {index.Format()}) asset ID to {id.Format()}.");
         return true;
     }
 
