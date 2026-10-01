@@ -782,7 +782,9 @@ public static class NetFactory
         // singleplayer
         if (Provider.isServer)
         {
+#if MESSAGE_ENUM_LOGGING
             Logger.DevkitServer.LogDebug(Source, "Incoming message for singleplayer. 1");
+#endif
             if (value == EClientMessage.Accepted)
             {
                 TriggerAccepted();
@@ -896,7 +898,9 @@ public static class NetFactory
         // singleplayer
         if (Provider.isServer)
         {
+#if MESSAGE_ENUM_LOGGING
             Logger.DevkitServer.LogDebug(Source, "Outgoing message for singleplayer. 7");
+#endif
             return true;
         }
 #endif

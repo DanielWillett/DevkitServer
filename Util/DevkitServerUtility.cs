@@ -47,6 +47,29 @@ public static class DevkitServerUtility
         return x * x + z * z;
     }
 
+    /// <summary>
+    /// Scales a 2-component vector to not exceed the given <paramref name="maxComponent"/>, while keeping it's ratio.
+    /// </summary>
+    /// <param name="v2">The vector to scale.</param>
+    /// <param name="maxComponent">The maximum size of any one component.</param>
+    /// <param name="x">The scaled X component.</param>
+    /// <param name="y">The scaled Y component.</param>
+    [Pure]
+    public static void ScaleVector2ToFit(Vector2 v2, float maxComponent, out double x, out double y)
+    {
+        double aspect = (double)v2.x / v2.y;
+        if (v2.x <= v2.y)
+        {
+            x = aspect * maxComponent;
+            y = maxComponent;
+        }
+        else
+        {
+            y = maxComponent / aspect;
+            x = maxComponent;
+        }
+    }
+
     [Pure]
     public static bool IsNearlyEqual(this in Quaternion quaternion, in Quaternion other, float tolerance = 0.001f)
     {

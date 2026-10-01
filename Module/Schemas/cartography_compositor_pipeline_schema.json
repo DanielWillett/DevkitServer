@@ -28,6 +28,12 @@
       "exclusiveMinimum": 0,
       "maximum": 32767
     },
+    "power_of_two_size": {
+      "description": "Should be a power of two (1024, 2048, etc). If present, adjusts how the map renders so that it renders the longest side with this value, and adds extra padding (background_color) in the margins.",
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 32767
+    },
     "image_size_y": {
       "description": "Height of the output image in pixels. Defaults to the map size.",
       "type": "integer",

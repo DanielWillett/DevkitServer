@@ -1,3 +1,5 @@
+using SDG.Framework.Water;
+
 namespace DevkitServer.API.Cartography;
 
 /// <summary>
@@ -23,12 +25,17 @@ public readonly ref struct CartographyCaptureData
     /// <summary>
     /// Map coordinates.
     /// </summary>
-    public readonly Vector2Int ImageSize;
+    public readonly Vector2Int TextureSize;
 
     /// <summary>
-    /// Area of the image that is captured to.
+    /// Area of the map coordinates to be captured.
     /// </summary>
-    public readonly RectInt ImageCaptureArea;
+    public readonly Rect ImageCaptureArea;
+
+    /// <summary>
+    /// The area on the texture where the map should be written.
+    /// </summary>
+    public readonly RectInt ImageWriteArea;
 
     /// <summary>
     /// World coordinates, size of the bounds to capture.
@@ -60,11 +67,27 @@ public readonly ref struct CartographyCaptureData
     /// </summary>
     public readonly CartographyType Type;
 
-    internal CartographyCaptureData(LevelInfo level, string outputPath, Vector2Int imageSize, Vector3 captureSize, Vector3 captureCenter, float seaLevel, CartographyType type, string? configurationFilePath, RectInt imageCaptureArea)
+    /// <summary>
+    /// X and Y scale multiplied by image pixel coordinates to get the corresponding world coordinate (before map transformations).
+    /// </summary>
+    /// <remarks>Without any size overrides this is <c>1, 1</c>, even with cartography volumes.</remarks>
+    public readonly Vector2 CaptureScale;
+
+    internal CartographyCaptureData(
+        LevelInfo level,
+        string outputPath,
+        Vector2Int textureSize,
+        Vector3 captureSize,
+        Vector3 captureCenter,
+        CartographyType type,
+        string? configurationFilePath,
+        Rect imageCaptureArea,
+        RectInt imageWriteArea
+    )
     {
         Level = level;
         OutputPath = outputPath;
-        ImageSize = imageSize;
+        TextureSize = textureSize;
         CaptureSize = captureSize;
         CaptureCenter = captureCenter;
         MaxHeight = captureCenter.y + captureSize.y / 2f;
@@ -72,6 +95,8 @@ public readonly ref struct CartographyCaptureData
         Type = type;
         ConfigurationFilePath = configurationFilePath;
         ImageCaptureArea = imageCaptureArea;
-        SeaLevel = seaLevel;
+        CaptureScale = new Vector2(imageCaptureArea.width / imageWriteArea.width, imageCaptureArea.height / imageWriteArea.height);
+        SeaLevel = WaterVolumeManager.worldSeaLevel;
+        ImageWriteArea = imageWriteArea;
     }
 }

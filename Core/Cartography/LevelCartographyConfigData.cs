@@ -88,7 +88,7 @@ public class LevelCartographyConfigData : SchemaConfiguration
     /// <summary>
     /// Attempts to resolve a guid from <see cref="ChartOverrides"/>.
     /// </summary>
-    public bool TryGetObjectChartOverride(Guid guid, out EObjectChart chart)
+    public bool TryGetAssetChartOverride(Guid guid, out EObjectChart chart)
     {
         if (ChartOverrides == null || ChartOverrides.Count == 0)
         {

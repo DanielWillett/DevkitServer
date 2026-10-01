@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 using System.Text.RegularExpressions;
+using DanielWillett.SpeedBytes.Formatting;
 using Unturned.SystemEx;
 using Version = System.Version;
 #if SERVER
@@ -748,6 +749,7 @@ public static class FormattingUtil
                 return guid.ToString(format).Colorize(FormatProvider.StackCleaner.Configuration.Colors!.StructColor);
             return ("{" + guid.ToString("N") + "}").Colorize(FormatProvider.StackCleaner.Configuration.Colors!.StructColor);
         }
+#pragma warning disable CS0618 // Type or member is obsolete (IAssetReference)
         if (obj is IAssetReference assetReference)
         {
             if (DevkitServerModule.IsMainThread && Assets.find(assetReference.GUID) is { } asset2)
@@ -755,6 +757,7 @@ public static class FormattingUtil
             else
                 return ("{" + assetReference.GUID.ToString("N") + "}").Colorize(FormatProvider.StackCleaner.Configuration.Colors!.StructColor);
         }
+#pragma warning restore CS0618
         if (obj is Asset asset)
         {
             Color color = asset switch
@@ -1165,7 +1168,7 @@ public static class FormattingUtil
     /// <summary>
     /// Format the given bytes in hexadecimal (base 16) columns.
     /// </summary>
-    /// <remarks>Recommended to use <see cref="FormatBinary(ReadOnlySpan{byte},BinaryStringFormat)"/> or <see cref="FormatBinary(ReadOnlySpan{byte},Span{char},BinaryStringFormat)"/> if it fits your use case.</remarks>
+    /// <remarks>Recommended to use <see cref="ByteFormatter.FormatBinary(ReadOnlySpan{byte},ByteStringFormat)"/> or <see cref="ByteFormatter.FormatBinary(ReadOnlySpan{byte},Span{char},ByteStringFormat)"/> if it fits your use case.</remarks>
     /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static string GetBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
@@ -1176,7 +1179,7 @@ public static class FormattingUtil
     /// <summary>
     /// Format the given bytes in decimal (base 10) columns.
     /// </summary>
-    /// <remarks>Recommended to use <see cref="FormatBinary(ReadOnlySpan{byte},BinaryStringFormat)"/> or <see cref="FormatBinary(ReadOnlySpan{byte},Span{char},BinaryStringFormat)"/> if it fits your use case.</remarks>
+    /// <remarks>Recommended to use <see cref="ByteFormatter.FormatBinary(ReadOnlySpan{byte},ByteStringFormat)"/> or <see cref="ByteFormatter.FormatBinary(ReadOnlySpan{byte},Span{char},ByteStringFormat)"/> if it fits your use case.</remarks>
     /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static string GetBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
@@ -1187,7 +1190,7 @@ public static class FormattingUtil
     /// <summary>
     /// Format the given bytes in hexadecimal (base 16) columns.
     /// </summary>
-    /// <remarks>Recommended to use <see cref="FormatBinary(ReadOnlySpan{byte},BinaryStringFormat)"/> or <see cref="FormatBinary(ReadOnlySpan{byte},Span{char},BinaryStringFormat)"/> if it fits your use case.</remarks>
+    /// <remarks>Recommended to use <see cref="ByteFormatter.FormatBinary(ReadOnlySpan{byte},ByteStringFormat)"/> or <see cref="ByteFormatter.FormatBinary(ReadOnlySpan{byte},Span{char},ByteStringFormat)"/> if it fits your use case.</remarks>
     /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static unsafe string GetBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
@@ -1198,7 +1201,7 @@ public static class FormattingUtil
     /// <summary>
     /// Format the given bytes in decimal (base 10) columns.
     /// </summary>
-    /// <remarks>Recommended to use <see cref="FormatBinary(ReadOnlySpan{byte},BinaryStringFormat)"/> or <see cref="FormatBinary(ReadOnlySpan{byte},Span{char},BinaryStringFormat)"/> if it fits your use case.</remarks>
+    /// <remarks>Recommended to use <see cref="ByteFormatter.FormatBinary(ReadOnlySpan{byte},ByteStringFormat)"/> or <see cref="ByteFormatter.FormatBinary(ReadOnlySpan{byte},Span{char},ByteStringFormat)"/> if it fits your use case.</remarks>
     /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static unsafe string GetBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
@@ -1209,7 +1212,7 @@ public static class FormattingUtil
     /// <summary>
     /// Format the given bytes in the given <paramref name="fmt"/> into columns. The format should return a fixed length string.
     /// </summary>
-    /// <remarks>Recommended to use <see cref="FormatBinary(ReadOnlySpan{byte},BinaryStringFormat)"/> or <see cref="FormatBinary(ReadOnlySpan{byte},Span{char},BinaryStringFormat)"/> if it fits your use case.</remarks>
+    /// <remarks>Recommended to use <see cref="ByteFormatter.FormatBinary(ReadOnlySpan{byte},ByteStringFormat)"/> or <see cref="ByteFormatter.FormatBinary(ReadOnlySpan{byte},Span{char},ByteStringFormat)"/> if it fits your use case.</remarks>
     /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static unsafe string FormatBinary(byte[] bytes, int columnCount, int offset, int len, string fmt, bool formatMessageOverhead = false)
@@ -1250,7 +1253,7 @@ public static class FormattingUtil
     /// <summary>
     /// Format the given bytes in the given <paramref name="fmt"/> into columns. The format should return a fixed length string.
     /// </summary>
-    /// <remarks>Recommended to use <see cref="FormatBinary(ReadOnlySpan{byte},BinaryStringFormat)"/> or <see cref="FormatBinary(ReadOnlySpan{byte},Span{char},BinaryStringFormat)"/> if it fits your use case.</remarks>
+    /// <remarks>Recommended to use <see cref="ByteFormatter.FormatBinary(ReadOnlySpan{byte},ByteStringFormat)"/> or <see cref="ByteFormatter.FormatBinary(ReadOnlySpan{byte},Span{char},ByteStringFormat)"/> if it fits your use case.</remarks>
     /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static unsafe string FormatBinary(byte* bytes, int columnCount, int offset, int len, string fmt, bool formatMessageOverhead = false)

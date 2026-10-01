@@ -22,9 +22,11 @@ internal struct SetupChartRaycastsJob : IJobParallelFor
         int chart = ChartMask;
         float height = Height;
 
-        Commands[index]     = new RaycastCommand(new Vector3(castPoint.x + 0.75f, height, castPoint.y + 0.75f), dir, len, chart);
-        Commands[index + 1] = new RaycastCommand(new Vector3(castPoint.x + 0.25f, height, castPoint.y + 0.75f), dir, len, chart);
-        Commands[index + 2] = new RaycastCommand(new Vector3(castPoint.x + 0.75f, height, castPoint.y + 0.25f), dir, len, chart);
-        Commands[index + 3] = new RaycastCommand(new Vector3(castPoint.x + 0.25f, height, castPoint.y + 0.25f), dir, len, chart);
+        QueryParameters queryParams = new QueryParameters(chart, hitTriggers: QueryTriggerInteraction.Ignore);
+
+        Commands[index]     = new RaycastCommand(new Vector3(castPoint.x + 0.75f, height, castPoint.y + 0.75f), dir, queryParams, len);
+        Commands[index + 1] = new RaycastCommand(new Vector3(castPoint.x + 0.25f, height, castPoint.y + 0.75f), dir, queryParams, len);
+        Commands[index + 2] = new RaycastCommand(new Vector3(castPoint.x + 0.75f, height, castPoint.y + 0.25f), dir, queryParams, len);
+        Commands[index + 3] = new RaycastCommand(new Vector3(castPoint.x + 0.25f, height, castPoint.y + 0.25f), dir, queryParams, len);
     }
 }

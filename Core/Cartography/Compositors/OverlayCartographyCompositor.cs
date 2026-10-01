@@ -131,8 +131,8 @@ internal class OverlayCartographyCompositor : ICartographyCompositor
             compositedTexture.LoadImage(File.ReadAllBytes(filePath), false);
             _ = texture.Value; // ensure the render texture has been initialized.
             GL.PushMatrix();
-            GL.LoadPixelMatrix(0, data.ImageSize.x, data.ImageSize.y, 0);
-            Graphics.DrawTexture(new Rect(0f, 0f, data.ImageSize.x, data.ImageSize.y), compositedTexture);
+            GL.LoadPixelMatrix(0, data.TextureSize.x, data.TextureSize.y, 0f);
+            Graphics.DrawTexture(new Rect(data.ImageWriteArea.x, data.ImageWriteArea.y, data.ImageWriteArea.width, data.ImageWriteArea.height), compositedTexture);
             GL.PopMatrix();
             return true;
         }

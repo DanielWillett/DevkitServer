@@ -131,7 +131,7 @@ internal static class CartographyCompositing
         
         if (renderTexture.IsValueCreated)
         {
-            texture.ReadPixels(new Rect(0, 0, data.ImageSize.x, data.ImageSize.y), 0, 0, false);
+            texture.ReadPixels(new Rect(0, 0, data.TextureSize.x, data.TextureSize.y), 0, 0, false);
             RenderTexture.active = active;
             RenderTexture.ReleaseTemporary(renderTexture.Value);
             Logger.DevkitServer.LogDebug(nameof(CartographyCompositing), "Released compositing render texture.");

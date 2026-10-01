@@ -3,5 +3,5 @@ namespace DevkitServer;
 // This file is automatically overwritten during commit.
 internal static class CommitId
 {
-public static readonly string Commit = "de20f93637901cc47673d4b6010fea2e962a1309";
+public static readonly string Commit = "5351b7100b455a4dc9e8e5c4b49fc0de90d34247";
 }

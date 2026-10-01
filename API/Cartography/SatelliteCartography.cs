@@ -79,10 +79,14 @@ public static class SatelliteCartography
         if (float.IsFinite(oldTime))
             LevelLighting.time = oldTime;
 
-        await FileUtil.EncodeAndSaveTexture(texture, outputFile, JpegQuality, token);
-#if DEBUG
-        ThreadUtil.assertIsGameThread();
-#endif
+        try
+        {
+            await FileUtil.EncodeAndSaveTextureWithRetry(texture, outputFile, JpegQuality, token: token);
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError(nameof(SatelliteCartography), ex, "Failed to write GPS texture.");
+        }
         await UniTask.SwitchToMainThread();
         Object.DestroyImmediate(texture);
 
@@ -92,51 +96,50 @@ public static class SatelliteCartography
     {
         // should be ran at end of frame
 
-        Vector2Int imgSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out Vector2Int superSampleSize, out bool wasSizeOutOfBounds, out bool wasSuperSampleOutOfBounds, configData);
+        CompositorPipeline? pipeline = configData as CompositorPipeline;
 
-        Vector2Int captureSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out _, out _, out _);
+        // default size of texture
+        Vector2 imgSizeUnrounded = CartographyTool.GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds, configData, needsToSuperSample: true);
+        Vector2Int imgSize = new Vector2Int((int)Math.Ceiling(imgSizeUnrounded.x), (int)Math.Ceiling(imgSizeUnrounded.y));
+        Vector2Int imgOffset = Vector2Int.zero;
 
-        int cx = 0, cy = 0, cw = captureSize.x, ch = captureSize.y;
-        if (captureSize.x > imgSize.x)
-            cw = imgSize.x;
-        else
-            cx = (imgSize.x - captureSize.x) / 2;
+        // size of actual texture
+        Vector2Int textureSize = imgSize;
 
-        if (captureSize.y > imgSize.y)
-            ch = imgSize.y;
-        else
-            cy = (imgSize.y - captureSize.y) / 2;
+#if CLIENT
+        // apply PO2 scaling, etc
+        pipeline?.TryApplyScalingAdjustments(ref wasSizeOutOfBounds, ref imgSize, ref imgOffset, ref textureSize);
+#endif
 
-        RectInt captureRect = new RectInt(cx, cy, cw, ch);
+        Logger.DevkitServer.LogDebug(nameof(SatelliteCartography), $"Image size (unrounded) : {imgSizeUnrounded.Format("F2")}");
+        Logger.DevkitServer.LogDebug(nameof(SatelliteCartography), $"Image size (rounded)   : {imgSize.Format("F2")}");
+        Logger.DevkitServer.LogDebug(nameof(SatelliteCartography), $"Texture size           : {textureSize.Format("F2")}");
 
-        cx = 0; cy = 0; cw = captureSize.x; ch = captureSize.y;
-        if (captureSize.x > superSampleSize.x)
-            cw = superSampleSize.x;
-        else
-            cx = (superSampleSize.x - captureSize.x) / 2;
+        Vector2 captureSize = CartographyTool.ImageSizeUnrounded;
+        Rect captureRect = new Rect(0, 0, captureSize.x, captureSize.y);
+        RectInt imageRect = new RectInt(imgOffset.x, imgOffset.y, imgSize.x, imgSize.y);
 
-        if (captureSize.y > superSampleSize.y)
-            ch = superSampleSize.y;
-        else
-            cy = (superSampleSize.y - captureSize.y) / 2;
-        RectInt superSampleRect = new RectInt(cx, cy, cw, ch);
+        if (wasSizeOutOfBounds)
+        {
+            Logger.DevkitServer.LogWarning(nameof(SatelliteCartography), $"Render size was clamped to {imgSize.Format()} because " +
+                                                                     $"it was more than the max texture size of this system " +
+                                                                     $"(which is {DevkitServerUtility.MaxTextureDimensionSize.Format()}).");
+        }
+
+        Bounds captureBounds = CartographyTool.CaptureBounds;
+
+        Logger.DevkitServer.LogDebug(nameof(SatelliteCartography), $"Capture size   : {captureSize.Format("F2")}");
+        Logger.DevkitServer.LogDebug(nameof(SatelliteCartography), $"Image rect     : {imageRect.Format("F2")}");
+        Logger.DevkitServer.LogDebug(nameof(SatelliteCartography), $"Capture bounds : {captureBounds.Format("F2")}");
 
         Logger.DevkitServer.LogConditional(nameof(SatelliteCartography), $"Capture rect: {captureRect.Format()}, imgSize: {imgSize.Format()}, captureSize: {captureSize.Format()}.");
 
         if (wasSizeOutOfBounds)
         {
-            Logger.DevkitServer.LogWarning(nameof(SatelliteCartography), $"Render size was clamped to {imgSize.Format()} because " +
-                                                                         $"it was more than the max texture size of this system " +
+            Logger.DevkitServer.LogWarning(nameof(SatelliteCartography), $"Render size was clamped to {imgSize.Format()} because the supersample " +
+                                                                         $"(x2 rendering for maps) was more than the max texture size of this system " +
                                                                          $"(which is {DevkitServerUtility.MaxTextureDimensionSize.Format()}).");
         }
-        else if (wasSuperSampleOutOfBounds)
-        {
-            Logger.DevkitServer.LogWarning(nameof(SatelliteCartography), $"Supersampling size was clamped to {superSampleSize.Format()} because " +
-                                                                         $"it was more than the max texture size of this system " +
-                                                                         $"(which is {DevkitServerUtility.MaxTextureDimensionSize.Format()}).");
-        }
-
-        Bounds captureBounds = CartographyTool.CaptureBounds;
 
         Transform? mapper = Level.editing.Find("Mapper");
         Camera? renderCamera = mapper == null ? null : mapper.GetComponent<Camera>();
@@ -147,22 +150,31 @@ public static class SatelliteCartography
             return null;
         }
 
-        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, CartographyType.Satellite, configurationSource.Path, captureRect);
+        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, textureSize, captureBounds.size, captureBounds.center, CartographyType.Satellite, configurationSource.Path, captureRect, imageRect);
 
         renderCamera.transform.SetPositionAndRotation(CartographyTool.CaptureBounds.center with
         {
             y = CartographyTool.LegacyMapping ? 1028f : CartographyTool.CaptureBounds.max.y
         }, CartographyTool.TransformMatrix.rotation);
 
-        renderCamera.aspect = CartographyTool.CaptureSize.x / CartographyTool.CaptureSize.y;
-        renderCamera.orthographicSize = CartographyTool.CaptureSize.y * 0.5f;
+        Vector2 captureSizeWorld = CartographyTool.CaptureSize;
+        renderCamera.aspect = captureSizeWorld.x / captureSizeWorld.y;
+        renderCamera.orthographicSize = captureSizeWorld.y * 0.5f;
 
-        RenderTexture rt = RenderTexture.GetTemporary(superSampleRect.width, superSampleRect.height, 32);
+        RenderTexture rt = RenderTexture.GetTemporary(imgSize.x * 2, imgSize.y * 2, 32);
 
         rt.name = "Satellite";
         rt.filterMode = FilterMode.Bilinear;
 
         renderCamera.targetTexture = rt;
+        Color oldBkgrColor = renderCamera.backgroundColor;
+        CameraClearFlags oldClearFlags = renderCamera.clearFlags;
+        if (pipeline != null)
+        {
+            Color bkgr = pipeline.BackgroundColor;
+            renderCamera.backgroundColor = bkgr;
+            oldClearFlags = CameraClearFlags.Color;
+        }
 
         bool fog = RenderSettings.fog;
         AmbientMode ambientMode = RenderSettings.ambientMode;
@@ -198,6 +210,12 @@ public static class SatelliteCartography
 
         renderCamera.Render();
 
+        if (pipeline != null)
+        {
+            renderCamera.backgroundColor = oldBkgrColor;
+            renderCamera.clearFlags = oldClearFlags;
+        }
+
         eventDele = typeof(Level).GetField(nameof(Level.onSatellitePostCapture), BindingFlags.NonPublic | BindingFlags.Static);
         if (eventDele == null)
             Logger.DevkitServer.LogWarning(nameof(SatelliteCartography), "Failed to get Level.onSatellitePostCapture. Check for updates or report this as a bug.");
@@ -219,12 +237,12 @@ public static class SatelliteCartography
         QualitySettings.lodBias = lodBias;
         GraphicsSettings.apply($"Finished capturing satellite for level {level.getLocalizedName()}.");
 
-        Texture2D texture = new Texture2D(imgSize.x, imgSize.y)
+        Texture2D texture = new Texture2D(textureSize.x, textureSize.y)
         {
             hideFlags = HideFlags.HideAndDontSave
         };
 
-        RenderTexture recaptureTarget = RenderTexture.GetTemporary(captureRect.width, captureRect.height);
+        RenderTexture recaptureTarget = RenderTexture.GetTemporary(imgSize.x, imgSize.y);
 
         Graphics.Blit(rt, recaptureTarget);
 
@@ -233,22 +251,19 @@ public static class SatelliteCartography
         RenderTexture? oldActive = RenderTexture.active;
         RenderTexture.active = recaptureTarget;
 
-        Vector2Int capturePos = default;
-
-        if (imgSize.x > captureSize.x)
-            capturePos.x = (imgSize.x - captureSize.x) / 2;
-
-        if (captureSize.y < imgSize.y)
-            capturePos.y = (imgSize.y - captureSize.y) / 2;
-
-        if (captureSize != imgSize && configData is CompositorPipeline pipeline)
+        if (captureSize != imgSize && pipeline != null)
         {
-            Color32[] pixels = new Color32[imgSize.x * imgSize.y];
+            Color32[] pixels = new Color32[textureSize.x * textureSize.y];
             Array.Fill(pixels, pipeline.BackgroundColor);
             texture.SetPixels32(pixels);
         }
 
-        texture.ReadPixels(new Rect(0, 0, captureRect.width, captureRect.height), capturePos.x, capturePos.y, false);
+        texture.ReadPixels(
+            new Rect(0, 0, imgSize.x, imgSize.y),
+            data.ImageWriteArea.x,
+            data.ImageWriteArea.y,
+            false
+        );
 
         RenderTexture.active = oldActive;
         RenderTexture.ReleaseTemporary(recaptureTarget);
@@ -283,4 +298,4 @@ public static class SatelliteCartography
         return texture;
     }
 #endif
-    }
+}

@@ -424,6 +424,33 @@ public static class FileUtil
     /// <summary>
     /// Asynchronously encodes an image and writes it to disk in either PNG or JPEG, depending on the extension of <paramref name="outputFile"/>.
     /// </summary>
+    /// <remarks>Retries a number of times before throwing.</remarks>
+    public static async UniTask EncodeAndSaveTextureWithRetry(Texture2D texture, string outputFile, int jpegQuality = 85, int tryCt = 5, CancellationToken token = default)
+    {
+        for (int i = 0; i < tryCt; ++i)
+        {
+            try
+            {
+#if DEBUG
+                Logger.DevkitServer.LogDebug(nameof(EncodeImageJob), $"Write texture {texture.name.Format()}, try #{(i + 1).Format()}:");
+#endif
+                await EncodeAndSaveTexture(texture, outputFile, jpegQuality, token);
+                break;
+            }
+            catch (Exception ex)
+            {
+                if (i == tryCt - 1)
+                    throw;
+
+                Logger.DevkitServer.LogWarning(nameof(FileUtil), ex, $"Error saving texture {texture.name.Format()}: {(i + 1).Format()}/{tryCt.Format()}.");
+                await UniTask.Delay(500, cancellationToken: token);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously encodes an image and writes it to disk in either PNG or JPEG, depending on the extension of <paramref name="outputFile"/>.
+    /// </summary>
     public static async UniTask EncodeAndSaveTexture(Texture2D texture, string outputFile, int jpegQuality = 85, CancellationToken token = default)
     {
         await UniTask.SwitchToMainThread(token);
@@ -432,6 +459,7 @@ public static class FileUtil
         Stopwatch sw = Stopwatch.StartNew();
 #endif
         byte[] rawData = texture.GetRawTextureData();
+        byte[] pngData;
         string extension = Path.GetExtension(outputFile);
         EncodeImageJob encodeJob = new EncodeImageJob
         {
@@ -445,29 +473,35 @@ public static class FileUtil
                       || extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase),
             JpegQuality = jpegQuality
         };
-        if (!encodeJob.UseJpeg && !extension.Equals(".png", StringComparison.OrdinalIgnoreCase))
-            outputFile += ".png";
+        try
+        {
+            if (!encodeJob.UseJpeg && !extension.Equals(".png", StringComparison.OrdinalIgnoreCase))
+                outputFile += ".png";
 
-        JobHandle handle = encodeJob.Schedule();
+            JobHandle handle = encodeJob.Schedule();
 #if DEBUG
-        sw.Stop();
-        Logger.DevkitServer.LogDebug(nameof(EncodeImageJob), $"Setup encode: {sw.GetElapsedMilliseconds().Format("0.##")} ms.");
+            sw.Stop();
+            Logger.DevkitServer.LogDebug(nameof(EncodeImageJob), $"Setup encode: {sw.GetElapsedMilliseconds().Format("0.##")} ms.");
 
-        sw.Restart();
+            sw.Restart();
 #endif
-        await handle;
+            await handle;
 
 #if DEBUG
-        sw.Stop();
-        Logger.DevkitServer.LogDebug(nameof(EncodeImageJob), $"Await encode: {sw.GetElapsedMilliseconds().Format("0.##")} ms.");
+            sw.Stop();
+            Logger.DevkitServer.LogDebug(nameof(EncodeImageJob), $"Await encode: {sw.GetElapsedMilliseconds().Format("0.##")} ms.");
 
-        sw.Restart();
+            sw.Restart();
 #endif
-        byte[] pngData = new byte[encodeJob.OutputSize[0]];
-        NativeArray<byte>.Copy(encodeJob.OutputPNG, pngData, pngData.Length);
-        encodeJob.InputTexture.Dispose();
-        encodeJob.OutputPNG.Dispose();
-        encodeJob.OutputSize.Dispose();
+            pngData = new byte[encodeJob.OutputSize[0]];
+            NativeArray<byte>.Copy(encodeJob.OutputPNG, pngData, pngData.Length);
+        }
+        finally
+        {
+            encodeJob.InputTexture.Dispose();
+            encodeJob.OutputPNG.Dispose();
+            encodeJob.OutputSize.Dispose();
+        }
 #if DEBUG
         sw.Stop();
         Logger.DevkitServer.LogDebug(nameof(EncodeImageJob), $"Cleanup encode: {sw.GetElapsedMilliseconds().Format("0.##")} ms.");
@@ -484,6 +518,5 @@ public static class FileUtil
         sw.Stop();
         Logger.DevkitServer.LogDebug(nameof(EncodeImageJob), $"Write: {sw.GetElapsedMilliseconds().Format("0.##")} ms.");
 #endif
-        await UniTask.SwitchToMainThread(token);
     }
 }

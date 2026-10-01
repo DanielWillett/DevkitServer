@@ -88,7 +88,7 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
                 if (obj.asset == null)
                     return EObjectChart.IGNORE;
 
-                if (configData != null && configData.TryGetObjectChartOverride(obj.asset.GUID, out EObjectChart chart))
+                if (configData != null && configData.TryGetAssetChartOverride(obj.asset.GUID, out EObjectChart chart))
                     return chart;
 
                 return obj.asset.chart;
@@ -104,7 +104,7 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
                 if (obj.asset == null)
                     return EObjectChart.IGNORE;
 
-                if (configData != null && configData.TryGetObjectChartOverride(obj.asset.GUID, out EObjectChart chart))
+                if (configData != null && configData.TryGetAssetChartOverride(obj.asset.GUID, out EObjectChart chart))
                     return chart;
 
                 return obj.asset.chart;
@@ -129,7 +129,7 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
             if (sp.asset == null)
                 return EObjectChart.IGNORE;
 
-            if (configData != null && configData.TryGetObjectChartOverride(sp.asset.GUID, out EObjectChart chart))
+            if (configData != null && configData.TryGetAssetChartOverride(sp.asset.GUID, out EObjectChart chart))
                 return chart;
 
             return sp.asset.chart;
@@ -145,7 +145,7 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
             if (sp.asset == null)
                 return EObjectChart.IGNORE;
 
-            if (configData != null && configData.TryGetObjectChartOverride(sp.asset.GUID, out EObjectChart chart))
+            if (configData != null && configData.TryGetAssetChartOverride(sp.asset.GUID, out EObjectChart chart))
                 return chart;
 
             return sp.asset.chart;
@@ -163,6 +163,7 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
 
         Transform? parent = transform.parent;
         byte materialIndex = byte.MaxValue;
+        RoadAsset? roadAsset = null;
         for (int i = 0; i < ushort.MaxValue; ++i)
         {
             Road? road = LevelRoads.getRoad(i);
@@ -172,9 +173,20 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
             if (!ReferenceEquals(road.road, transform) && !ReferenceEquals(road.road, parent))
                 continue;
 
+            roadAsset = road.GetRoadAsset();
             material = LevelRoads.materials[road.material];
             materialIndex = road.material;
             break;
+        }
+
+        if (roadAsset != null)
+        {
+            if (config == null || !config.TryGetAssetChartOverride(roadAsset.GUID, out chartType))
+            {
+                chartType = roadAsset.ChartOverride;
+            }
+
+            return LayerMasks.ENVIRONMENT;
         }
 
         if (material == null)

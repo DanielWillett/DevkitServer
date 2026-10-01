@@ -6,7 +6,6 @@ using DevkitServer.Core.Cartography;
 using DevkitServer.Core.Cartography.ChartColorProviders;
 using DevkitServer.Core.Cartography.Jobs;
 using DevkitServer.Plugins;
-using SDG.Framework.Water;
 using System.Diagnostics;
 using System.Text.Json;
 using Unity.Collections;
@@ -109,10 +108,14 @@ public static class ChartCartography
         if (texture == null)
             return null;
 
-        await FileUtil.EncodeAndSaveTexture(texture, outputFile, JpegQuality, token);
-#if DEBUG
-        ThreadUtil.assertIsGameThread();
-#endif
+        try
+        {
+            await FileUtil.EncodeAndSaveTextureWithRetry(texture, outputFile, JpegQuality, token: token);
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError(nameof(ChartCartography), ex, "Failed to write chart texture.");
+        }
         await UniTask.SwitchToMainThread(token);
         Object.DestroyImmediate(texture);
 
@@ -126,37 +129,63 @@ public static class ChartCartography
         // must be ran at the end of frame
 #if CLIENT
         _lastCartoKeepalive = 0;
+        CompositorPipeline? pipeline = configData as CompositorPipeline;
 #endif
 
-        Vector2Int imgSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds, configData);
+        // default size of texture
+        Vector2 imgSizeUnrounded = CartographyTool.GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds, configData);
+        Vector2Int imgSize = new Vector2Int((int)Math.Ceiling(imgSizeUnrounded.x), (int)Math.Ceiling(imgSizeUnrounded.y));
+        Vector2Int imgOffset = Vector2Int.zero;
 
-        Vector2Int captureSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out _);
+        // size of actual texture
+        Vector2Int textureSize = imgSize;
 
-        int cx = 0, cy = 0, cw = captureSize.x, ch = captureSize.y;
-        if (captureSize.x > imgSize.x)
-            cw = imgSize.x;
-        else
-            cx = (imgSize.x - captureSize.x) / 2;
+#if CLIENT
+        // apply PO2 scaling, etc
+        pipeline?.TryApplyScalingAdjustments(ref wasSizeOutOfBounds, ref imgSize, ref imgOffset, ref textureSize);
+#endif
 
-        if (captureSize.y > imgSize.y)
-            ch = imgSize.y;
-        else
-            cy = (imgSize.y - captureSize.y) / 2;
+        Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Image size (unrounded) : {imgSizeUnrounded.Format("F2")}");
+        Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Image size (rounded)   : {imgSize.Format("F2")}");
+        Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Texture size           : {textureSize.Format("F2")}");
 
-        RectInt captureRect = new RectInt(cx, cy, cw, ch);
+        Vector2 captureSize = CartographyTool.ImageSizeUnrounded;
+        Rect captureRect = new Rect(0, 0, captureSize.x, captureSize.y);
+        RectInt imageRect = new RectInt(imgOffset.x, imgOffset.y, imgSize.x, imgSize.y);
 
         if (wasSizeOutOfBounds)
         {
             Logger.DevkitServer.LogWarning(nameof(ChartCartography), $"Render size was clamped to {imgSize.Format()} because " +
-                                                                   $"it was more than the max texture size of this system " +
-                                                                   $"(which is {DevkitServerUtility.MaxTextureDimensionSize.Format()}).");
+                                                                     $"it was more than the max texture size of this system " +
+                                                                     $"(which is {DevkitServerUtility.MaxTextureDimensionSize.Format()}).");
         }
 
         Bounds captureBounds = CartographyTool.CaptureBounds;
 
-        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, CartographyType.Chart, configurationSource.Path, captureRect);
+        Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Capture size   : {captureSize.Format("F2")}");
+        Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Image rect     : {imageRect.Format("F2")}");
+        Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Capture bounds : {captureBounds.Format("F2")}");
 
-        byte[] outputRGB24Image = new byte[imgSize.x * imgSize.y * 3];
+        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, textureSize, captureBounds.size, captureBounds.center, CartographyType.Chart, configurationSource.Path, captureRect, imageRect);
+
+        int byteCt = textureSize.x * textureSize.y * 3;
+        byte[] outputRGB24Image = new byte[byteCt];
+#if CLIENT
+        if (pipeline != null)
+        {
+            Color32 bkgr = pipeline.BackgroundColor;
+            if (bkgr.r != 0 || bkgr.g != 0 || bkgr.b != 0)
+            {
+                int colorCount = textureSize.x * textureSize.y;
+                for (int i = 0; i < colorCount; ++i)
+                {
+                    outputRGB24Image[i * 3] = bkgr.r;
+                    outputRGB24Image[i * 3 + 1] = bkgr.g;
+                    outputRGB24Image[i * 3 + 2] = bkgr.b;
+                }
+            }
+        }
+#endif
 
         IChartColorProvider? colorProvider = GetChartColorProvider(in data, colorProviderName, configDocument, out ChartColorProviderInfo providerInfo);
 
@@ -167,11 +196,11 @@ public static class ChartCartography
             colorProvider.TryInitialize(in data, default, true);
         }
 
-        CartographyTool.SavePreCaptureState();
-
-        Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Creating chart with image size {data.ImageSize.x.Format()}x{data.ImageSize.y.Format()} = {(data.ImageSize.x * data.ImageSize.y).Format()}px.");
+        Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Creating chart with image size {data.TextureSize.x.Format()}x{data.TextureSize.y.Format()} = {(data.TextureSize.x * data.TextureSize.y).Format()}px.");
 
         Stopwatch sw = new Stopwatch();
+
+        CartographyTool.SavePreCaptureState();
         try
         {
             sw.Start();
@@ -184,11 +213,11 @@ public static class ChartCartography
                         break;
 
                     case ISamplingChartColorProvider sampleColorProvider:
-                        CaptureBackground(sampleColorProvider, configData, ptr, in data, providerInfo, sw);
+                        CaptureBackground(sampleColorProvider, configData, ptr, byteCt, in data, providerInfo, sw);
                         break;
 
                     case IFullChartColorProvider fullColorProvider:
-                        fullColorProvider.CaptureChart(in data, configData, ptr, sw);
+                        fullColorProvider.CaptureChart(in data, configData, ptr, byteCt, sw);
                         break;
 
                     default:
@@ -210,6 +239,7 @@ public static class ChartCartography
         catch (OperationCanceledException)
         {
             Logger.DevkitServer.LogWarning(nameof(ChartCartography), "Chart capture was cancelled early because you either disconnected from or connected to a server while the chart was rendering.");
+            CartographyTool.RestorePreCaptureState();
             return null;
         }
         finally
@@ -218,7 +248,7 @@ public static class ChartCartography
                 disp.Dispose();
         }
 
-        Texture2D outputTexture = new Texture2D(imgSize.x, imgSize.y, TextureFormat.RGB24, 1, false)
+        Texture2D outputTexture = new Texture2D(textureSize.x, textureSize.y, TextureFormat.RGB24, 1, false)
         {
             name = "Chart",
             hideFlags = HideFlags.HideAndDontSave,
@@ -266,8 +296,7 @@ public static class ChartCartography
     }
     private static unsafe void CaptureBackgroundUsingJobs(RaycastChartColorProvider colorProvider, LevelCartographyConfigData? config, byte* outputRgb24Image, in CartographyCaptureData data, ChartColorProviderInfo providerInfo, Stopwatch jobStopwatch)
     {
-        int imageSizeX = data.ImageCaptureArea.width, imageSizeY = data.ImageCaptureArea.height;
-        int imageStartX = data.ImageCaptureArea.x, imageStartY = data.ImageCaptureArea.y;
+        int imageSizeX = data.ImageWriteArea.width, imageSizeY = data.ImageWriteArea.height;
 
         int maxChunkSize = DevkitServerConfig.Config?.MaxChartRenderChunkSize ?? 4096;
         if (maxChunkSize <= 0)
@@ -278,15 +307,15 @@ public static class ChartCartography
             // split into chunks to prevent running out of memory
             int chunkSizeX = imageSizeX / 2 < maxChunkSize ? (imageSizeX - 1) / 2 + 1 : maxChunkSize;
             int chunkSizeY = imageSizeY / 2 < maxChunkSize ? (imageSizeY - 1) / 2 + 1 : maxChunkSize;
-            Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Chunks: {chunkSizeX.Format()}x{chunkSizeY.Format()}.");
-            int x = data.ImageCaptureArea.x;
+            Logger.DevkitServer.LogInfo(nameof(ChartCartography), $"Chart will be rendered in chunks to reduce memory usage. Chunk size: {chunkSizeX.Format()}x{chunkSizeY.Format()}.");
+            int x = 0;
             do
             {
-                int y = data.ImageCaptureArea.y;
+                int y = 0;
                 do
                 {
-                    CartographyChunkData chunk = new CartographyChunkData(x + imageStartX, y + imageStartY, Math.Min(x + chunkSizeX, imageSizeX) - 1 + imageStartX, Math.Min(y + chunkSizeY, imageSizeY) - 1 + imageStartY);
-                    Logger.DevkitServer.LogDebug(nameof(ChartCartography), $" Chunk: ({chunk.StartX.Format()} to {chunk.EndX.Format()}, {chunk.StartY.Format()} to {chunk.EndY.Format()}).");
+                    CartographyChunkData chunk = new CartographyChunkData(x, y, Math.Min(x + chunkSizeX, imageSizeX) - 1, Math.Min(y + chunkSizeY, imageSizeY) - 1);
+                    Logger.DevkitServer.LogDebug(nameof(ChartCartography), $" Chunk: ({chunk.StartX.Format()}: to {chunk.EndX.Format()}, {chunk.StartY.Format()}: to {chunk.EndY.Format()}).");
 
                     if (!CaptureBackgroundUsingJobsChunk(colorProvider, config, outputRgb24Image, in data, in chunk, providerInfo, jobStopwatch))
                         return;
@@ -300,7 +329,7 @@ public static class ChartCartography
             return;
         }
 
-        CartographyChunkData fullChunk = new CartographyChunkData(imageStartX, imageStartY, imageSizeX - 1 + imageStartX, imageSizeY - 1 + imageStartY);
+        CartographyChunkData fullChunk = new CartographyChunkData(0, 0, imageSizeX - 1, imageSizeY - 1);
         CaptureBackgroundUsingJobsChunk(colorProvider, config, outputRgb24Image, in data, in fullChunk, providerInfo, jobStopwatch);
     }
     private static unsafe bool CaptureBackgroundUsingJobsChunk(RaycastChartColorProvider colorProvider, LevelCartographyConfigData? config, byte* outputRgb24Image, in CartographyCaptureData data, in CartographyChunkData chunk, ChartColorProviderInfo providerInfo, [UsedImplicitly] Stopwatch jobStopwatch)
@@ -332,8 +361,8 @@ public static class ChartCartography
             {
                 for (int imgY = chunk.StartY; imgY <= chunk.EndY; ++imgY)
                 {
-                    v2.x = imgX - data.ImageCaptureArea.x;
-                    v2.y = imgY - data.ImageCaptureArea.y;
+                    v2.x = imgX * data.CaptureScale.x + data.ImageCaptureArea.x;
+                    v2.y = imgY * data.CaptureScale.y + data.ImageCaptureArea.y;
                     Vector3 worldCoordinates = CartographyTool.MapCoordsToWorldCoords(v2);
 
                     float x = worldCoordinates.x;
@@ -387,7 +416,7 @@ public static class ChartCartography
         i = -1;
         try
         {
-            int fullImgSizeX = data.ImageSize.x;
+            int fullImgSizeX = data.TextureSize.x;
             for (int imgX = chunk.StartX; imgX <= chunk.EndX; ++imgX)
             {
                 for (int imgY = chunk.StartY; imgY <= chunk.EndY; ++imgY)
@@ -408,7 +437,7 @@ public static class ChartCartography
                         (byte)((c1.b + c2.b + c3.b + c4.b) / 4),
                         255);
 
-                    int index = (imgX + imgY * fullImgSizeX) * 3;
+                    int index = (imgX + data.ImageWriteArea.x + (imgY + data.ImageWriteArea.y) * fullImgSizeX) * 3;
                     outputRgb24Image[index] = color.r;
                     outputRgb24Image[index + 1] = color.g;
                     outputRgb24Image[index + 2] = color.b;
@@ -466,7 +495,7 @@ public static class ChartCartography
     private static Transform? GetTransformAndLayerFast(ref RaycastHit hit, out int layer)
     {
         int colliderId = hit.colliderInstanceID;
-        if (colliderId == default)
+        if (colliderId == 0)
         {
             layer = LayerMasks.DEFAULT;
             return null;
@@ -542,9 +571,9 @@ public static class ChartCartography
         return prov.GetColor(in data, EObjectChart.GROUND, transform, layer, ref hit);
     }
 
-    private static unsafe void CaptureBackground(ISamplingChartColorProvider colorProvider, LevelCartographyConfigData? config, byte* outputRgb24Image, in CartographyCaptureData data, ChartColorProviderInfo providerInfo, [UsedImplicitly] Stopwatch jobStopwatch)
+    private static unsafe void CaptureBackground(ISamplingChartColorProvider colorProvider, LevelCartographyConfigData? config, byte* outputRgb24Image, int byteCt, in CartographyCaptureData data, ChartColorProviderInfo providerInfo, [UsedImplicitly] Stopwatch jobStopwatch)
     {
-        int imageSizeX = data.ImageCaptureArea.xMax, imageSizeY = data.ImageCaptureArea.yMax;
+        int imageSizeX = data.ImageWriteArea.width, imageSizeY = data.ImageWriteArea.height;
 
         const int rgb24Size = 3;
 
@@ -556,19 +585,19 @@ public static class ChartCartography
 
         try
         {
-            for (int x = data.ImageCaptureArea.x; x < imageSizeX; ++x)
+            for (int x = 0; x < imageSizeX; ++x)
             {
-                for (int y = data.ImageCaptureArea.y; y < imageSizeY; ++y)
+                for (int y = 0; y < imageSizeY; ++y)
                 {
-                    v2.x = x;
-                    v2.y = y;
+                    v2.x = x * data.CaptureScale.x + data.ImageCaptureArea.x;
+                    v2.y = y * data.CaptureScale.y + data.ImageCaptureArea.y;
                     Vector3 worldCoordinates = CartographyTool.MapCoordsToWorldCoords(v2);
 
                     v2.x = worldCoordinates.x;
                     v2.y = worldCoordinates.z;
 
                     Color32 color = colorProvider.SampleChartPosition(in data, config, v2);
-                    int index = (x + y * imageSizeX) * rgb24Size;
+                    int index = (x + data.ImageWriteArea.x + (y + data.ImageWriteArea.y) * imageSizeX) * rgb24Size;
                     outputRgb24Image[index] = color.r;
                     outputRgb24Image[index + 1] = color.g;
                     outputRgb24Image[index + 2] = color.b;

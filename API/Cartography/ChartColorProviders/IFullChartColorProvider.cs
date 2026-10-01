@@ -13,6 +13,6 @@ public interface IFullChartColorProvider : IChartColorProvider
     /// <para>Start index of the 3 RGB bytes can be calculated by <c>(pixelX + pixelY * data.ImageSize.x) * 3</c>.</para>
     /// </summary>
     /// <param name="rawRgb24Data">Output pointer for raw RGB24 image data.</param>
-    /// <remarks>After hitting an object, good implementations will use <see cref="LevelCartographyConfigData.TryGetObjectChartOverride"/> and <see cref="LevelCartographyConfigData.TryGetRoadMaterialChartOverride"/> to apply chart overrides from config.</remarks>
-    unsafe void CaptureChart(in CartographyCaptureData data, LevelCartographyConfigData? config, byte* rawRgb24Data, Stopwatch jobStopwatch);
+    /// <remarks>After hitting an object, good implementations will use <see cref="LevelCartographyConfigData.TryGetAssetChartOverride"/> and <see cref="LevelCartographyConfigData.TryGetRoadMaterialChartOverride"/> to apply chart overrides from config.</remarks>
+    unsafe void CaptureChart(in CartographyCaptureData data, LevelCartographyConfigData? config, byte* rawRgb24Data, int byteCt, Stopwatch jobStopwatch);
 }

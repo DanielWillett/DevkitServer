@@ -46,7 +46,7 @@ internal class DevkitServerResources
         new DevkitServerFileResource(Path.Combine("Schemas", "permission_groups_schema.json"), new Version(0, 0, 41, 0)) { Side = Side.Server },
         new DevkitServerFileResource(Path.Combine("Schemas", "chart_colors_schema.json"), new Version(0, 0, 41, 0)),
         new DevkitServerFileResource(Path.Combine("Schemas", "cartography_config_schema.json"), new Version(0, 0, 42, 0)),
-        new DevkitServerFileResource(Path.Combine("Schemas", "cartography_compositor_pipeline_schema.json"), new Version(0, 0, 42, 0)),
+        new DevkitServerFileResource(Path.Combine("Schemas", "cartography_compositor_pipeline_schema.json"), new Version(0, 0, 45, 0)),
 
         // Root
         new DevkitServerFileResource(@"DevkitServer.module", new Version(0, 0, 44, 0)),

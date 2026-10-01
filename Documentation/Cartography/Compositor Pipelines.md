@@ -39,6 +39,7 @@ The `type` property is how the UI knows whether or not to recognize a JSON file 
 | `chart_color_provider` | Text or Object | If `type` is `Chart`, this is the color provider used to supply colors to the chart renderer. |
 | `compositors` | List of Text or Object | Ordered list of type names or objects like: `{ "type": "< type name >", "other config...": "etc" }` which are used to apply effects to the base image. |
 | `chart_type_overrides` | Dictionary | List of chart color overrides for specific object `GUID`s or road material names. Values should be `WATER`, `CLIFF`, `ROAD`, etc. | 
+| `power_of_two_size` | Integer | Power of 2 (1024, 2048, etc) to render the map at. Margins will be added if the map isn't square using `background_color`. | 
 
 ## Example file
 ```jsonc

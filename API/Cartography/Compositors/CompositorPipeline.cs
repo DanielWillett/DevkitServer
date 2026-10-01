@@ -49,6 +49,12 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
     /// </summary>
     public Vector2Int? ImageSize { get; private set; }
 
+    /// <summary>
+    /// If present, adjusts how the map renders so that it renders the longest side with this value, and adds extra padding (background_color) in the margins.
+    /// </summary>
+    /// <remarks>Treated as non-set if <c>0</c>. Verified power-of-two when reading config.</remarks>
+    public ushort PowerOfTwoSize { get; private set; }
+
     public CompositorPipeline(string name, Type chartColorProvider, params CartographyCompositorConfigurationInfo[] compositors)
         : this(name)
     {
@@ -85,7 +91,6 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
             return await ChartCartography.CaptureChart(level, outputFile, configurationSource, token);
         }
 
-
         await UniTask.SwitchToMainThread(token);
 
         SyncTime(out float oldTime);
@@ -97,7 +102,14 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
         if (texture == null)
             return null;
 
-        await FileUtil.EncodeAndSaveTexture(texture, outputFile, jpegQuality, token);
+        try
+        {
+            await FileUtil.EncodeAndSaveTextureWithRetry(texture, outputFile, jpegQuality, token: token);
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError(nameof(CompositorPipeline), ex, "Failed to write cartography texture.");
+        }
         await UniTask.SwitchToMainThread(token);
         Object.DestroyImmediate(texture);
 
@@ -107,11 +119,50 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
         return outputFile;
     }
 
+    internal void TryApplyScalingAdjustments(ref bool wasSizeOutOfBounds, ref Vector2Int imgSize, ref Vector2Int imgOffset, ref Vector2Int textureSize)
+    {
+        // pretty safe to assume MaxTextureDimensionSize will be a PO2 (also nothing will really break if its not).
+        int po2 = PowerOfTwoSize;
+        if (po2 == 0)
+            return;
+
+        if (po2 > DevkitServerUtility.MaxTextureDimensionSize)
+        {
+            po2 = DevkitServerUtility.MaxTextureDimensionSize;
+            wasSizeOutOfBounds = true;
+        }
+
+        textureSize = new Vector2Int(po2, po2);
+
+        DevkitServerUtility.ScaleVector2ToFit(imgSize, po2, out double x, out double y);
+        imgSize.x = (int)Math.Ceiling(x);
+        imgSize.y = (int)Math.Ceiling(y);
+        if (x > y)
+        {
+            int margin = (int)Math.Round((po2 - y) / 2f);
+            imgOffset = new Vector2Int(0, margin);
+            imgSize.x = po2;
+            imgSize.y = po2 - margin * 2;
+        }
+        else if (x < y)
+        {
+            int margin = (int)Math.Round((po2 - x) / 2f);
+            imgOffset = new Vector2Int(margin, 0);
+            imgSize.x = po2 - margin * 2;
+            imgSize.y = po2;
+        }
+        else
+        {
+            imgSize = new Vector2Int(po2, po2);
+        }
+    }
+
     private Texture2D CaptureNoneSync(LevelInfo level, string outputFile)
     {
         // should be ran at end of frame
 
-        Vector2Int imgSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds, this);
+        Vector2 imgSizeUnrounded = CartographyTool.GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds, this);
+        Vector2Int imgSize = new Vector2Int((int)Math.Ceiling(imgSizeUnrounded.x), (int)Math.Ceiling(imgSizeUnrounded.y));
 
         RectInt captureRect = new RectInt(0, 0, imgSize.x, imgSize.y);
 
@@ -136,7 +187,7 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
         Stopwatch sw = Stopwatch.StartNew();
 
         Bounds captureBounds = CartographyTool.CaptureBounds;
-        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, Type, FilePath, captureRect);
+        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, Type, FilePath, default, captureRect);
         if (!CartographyCompositing.CompositeForeground(outputTexture, Compositors, in data))
         {
             sw.Stop();
@@ -208,7 +259,7 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
 
     private static void ReadJson(JsonElement root, CompositorPipeline value)
     {
-        string? type = root.GetProperty("type").GetString();
+        string? type = root.GetProperty("type"u8).GetString();
         if (!Enum.TryParse(type, ignoreCase: true, out CartographyType typeEnum) || typeEnum is < CartographyType.None or > CartographyType.Chart)
         {
             if (!string.Equals(type, "GPS", StringComparison.InvariantCultureIgnoreCase))
@@ -219,14 +270,14 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
 
         value.Type = typeEnum;
 
-        if (root.TryGetProperty("name", out JsonElement nameElement))
+        if (root.TryGetProperty("name"u8, out JsonElement nameElement))
         {
             string? name = nameElement.GetString();
             if (!string.IsNullOrWhiteSpace(name))
                 value.Name = name;
         }
 
-        if (root.TryGetProperty("output_file", out JsonElement pathElement) && pathElement.ValueKind == JsonValueKind.String)
+        if (root.TryGetProperty("output_file"u8, out JsonElement pathElement) && pathElement.ValueKind == JsonValueKind.String)
         {
             string? path = pathElement.GetString();
             if (!string.IsNullOrWhiteSpace(path))
@@ -237,7 +288,7 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
             }
         }
 
-        if (root.TryGetProperty("background_color", out JsonElement backgroundColorElement)
+        if (root.TryGetProperty("background_color"u8, out JsonElement backgroundColorElement)
             && backgroundColorElement.ValueKind == JsonValueKind.String
             && DevkitServerUtility.TryParseColor32(backgroundColorElement.GetString(), CultureInfo.InvariantCulture, out Color32 backgroundColor))
         {
@@ -250,7 +301,7 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
 
         value.BackgroundColor = backgroundColor;
 
-        if (root.TryGetProperty("compositors", out JsonElement compositorsElement) && compositorsElement.ValueKind != JsonValueKind.Null)
+        if (root.TryGetProperty("compositors"u8, out JsonElement compositorsElement) && compositorsElement.ValueKind != JsonValueKind.Null)
         {
             int len = compositorsElement.GetArrayLength();
             CartographyCompositorConfigurationInfo[] typeArr = len == 0
@@ -281,9 +332,9 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
             value.Compositors = Array.Empty<CartographyCompositorConfigurationInfo>();
         }
 
-        value.AutoOpen = root.TryGetProperty("auto_open", out JsonElement autoOpenElement) && autoOpenElement.ValueKind == JsonValueKind.True;
+        value.AutoOpen = root.TryGetProperty("auto_open"u8, out JsonElement autoOpenElement) && autoOpenElement.ValueKind == JsonValueKind.True;
 
-        if (root.TryGetProperty("time", out JsonElement element) && element.ValueKind is JsonValueKind.Number or JsonValueKind.String)
+        if (root.TryGetProperty("time"u8, out JsonElement element) && element.ValueKind is JsonValueKind.Number or JsonValueKind.String)
         {
             if (element.ValueKind == JsonValueKind.Number)
                 value.Time = ((int)MathF.Round(element.GetSingle())).ToString(CultureInfo.InvariantCulture);
@@ -291,9 +342,9 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
                 value.Time = element.GetString();
         }
 
-        if (root.TryGetProperty("image_size_x", out JsonElement sizeX)
+        if (root.TryGetProperty("image_size_x"u8, out JsonElement sizeX)
             && sizeX.ValueKind == JsonValueKind.Number
-            && root.TryGetProperty("image_size_y", out JsonElement sizeY)
+            && root.TryGetProperty("image_size_y"u8, out JsonElement sizeY)
             && sizeY.ValueKind == JsonValueKind.Number
             && sizeX.TryGetInt32(out int imageSizeX)
             && sizeY.TryGetInt32(out int imageSizeY))
@@ -305,10 +356,22 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
             value.ImageSize = null;
         }
 
+        if (root.TryGetProperty("power_of_two_size"u8, out JsonElement npotSizeElement)
+            && npotSizeElement.ValueKind == JsonValueKind.Number
+            && npotSizeElement.TryGetUInt16(out ushort npotSize)
+            && npotSize > 1)
+        {
+            int logValue = (int)Math.Log(npotSize, 2);
+            if (logValue >= 30 || 1 << logValue != npotSize)
+                throw new InvalidOperationException("\"power_of_two_size\" property must be > 1 and a power of two, such as: 512, 1024, 2048, 4096, etc.");
+
+            value.PowerOfTwoSize = npotSize;
+        }
+
         if (typeEnum != CartographyType.Chart)
             return;
 
-        if ((root.TryGetProperty("override_chart_color_provider", out JsonElement chartColor) || root.TryGetProperty("chart_color_provider", out chartColor))
+        if ((root.TryGetProperty("override_chart_color_provider"u8, out JsonElement chartColor) || root.TryGetProperty("chart_color_provider"u8, out chartColor))
             && chartColor.ValueKind == JsonValueKind.String)
         {
             value.PreferredChartColorProvider = chartColor.GetString();
@@ -318,7 +381,7 @@ public class CompositorPipeline : LevelCartographyConfigData, IDisposable
             value.PreferredChartColorProvider = null;
         }
 
-        if (root.TryGetProperty("chart_type_overrides", out JsonElement typeOverrideElements))
+        if (root.TryGetProperty("chart_type_overrides"u8, out JsonElement typeOverrideElements))
         {
             if (typeOverrideElements.ValueKind != JsonValueKind.Object)
                 throw new InvalidOperationException("\"chart_type_overrides\" property should be an object (string dictionary).");

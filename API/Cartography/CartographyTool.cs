@@ -44,6 +44,11 @@ public static class CartographyTool
     public static Vector2Int ImageSize => (_lvl ??= new CartographyData()).IntlMapImageSize;
 
     /// <summary>
+    /// Size of the Map.png and Chart.png images in pixels if they weren't rounded to integers.
+    /// </summary>
+    public static Vector2 ImageSizeUnrounded => (_lvl ??= new CartographyData()).IntlMapImageSizeUnrounded;
+
+    /// <summary>
     /// Is the map position/size based on <see cref="ELevelSize"/> instead of a <see cref="CartographyVolume"/>?
     /// </summary>
     public static bool LegacyMapping => (_lvl ??= new CartographyData()).IntlLegacyMapping;
@@ -138,114 +143,51 @@ public static class CartographyTool
     /// <summary>
     /// Considering <see cref="SystemInfo.maxTextureSize"/>, returns the desirable size for a satellite or chart image.
     /// </summary>
+    /// <remarks>The return value should be 'ceiled' if needed in pixels.</remarks>
     /// <param name="wasSizeOutOfBounds">Was the return value of this function clamped?</param>
-    public static Vector2Int GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds, LevelCartographyConfigData? configData = null)
+    public static Vector2 GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds, LevelCartographyConfigData? configData = null, bool needsToSuperSample = false)
     {
-        Vector2Int imgSize;
+        // ReSharper disable once JoinDeclarationAndInitializer
+        Vector2 imgSize;
 #if CLIENT
+        imgSize = ImageSizeUnrounded;
         if (configData is CompositorPipeline { ImageSize: { x: > 0 and <= 32767, y: > 0 and <= 32767 } size })
+        {
             imgSize = size;
-        else
-            imgSize = ImageSize;
+        }
 #else
         imgSize = ImageSize;
 #endif
 
         int maxTextureSize = DevkitServerUtility.MaxTextureDimensionSize;
-
-        if (imgSize.x > maxTextureSize || imgSize.y > maxTextureSize)
+        
+        if (needsToSuperSample)
         {
-            double aspect = (double)imgSize.x / imgSize.y;
-            double x, y;
-            if (imgSize.x <= imgSize.y)
+            Vector2 supersampleSize = new Vector2((float)Math.Ceiling(imgSize.x) * 2f, (float)Math.Ceiling(imgSize.y) * 2f);
+            if (supersampleSize.x > maxTextureSize || supersampleSize.y > maxTextureSize)
             {
-                x = aspect * maxTextureSize;
-                y = x / aspect;
+                DevkitServerUtility.ScaleVector2ToFit(supersampleSize, maxTextureSize, out double x, out double y);
+                supersampleSize.x = (float)x;
+                supersampleSize.y = (float)y;
+                imgSize = supersampleSize / 2f;
+                wasSizeOutOfBounds = true;
             }
             else
-            {
-                y = maxTextureSize / aspect;
-                x = aspect * y;
-            }
-
-            imgSize.x = (int)Math.Round(x);
-            imgSize.y = (int)Math.Round(y);
-            wasSizeOutOfBounds = true;
-        }
-        else
-            wasSizeOutOfBounds = false;
-
-        return imgSize;
-    }
-
-    /// <summary>
-    /// Considering <see cref="SystemInfo.maxTextureSize"/>, returns the desirable size for a satellite or chart image with extra info for satellite supersampling.
-    /// </summary>
-    /// <param name="superSampleSize">Used for satellite renders, returns the size for the supersampled texture (which will usually be double the return value) before it's scaled down.</param>
-    /// <param name="wasSizeOutOfBounds">Was the return value of this function and <paramref name="superSampleSize"/> clamped?</param>
-    /// <param name="wasSuperSampleOutOfBounds">Was <paramref name="wasSuperSampleOutOfBounds"/> clamped?</param>
-    public static Vector2Int GetImageSizeCheckMaxTextureSize(out Vector2Int superSampleSize, out bool wasSizeOutOfBounds, out bool wasSuperSampleOutOfBounds, LevelCartographyConfigData? configData = null)
-    {
-        Vector2Int imgSize;
-#if CLIENT
-        if (configData is CompositorPipeline { ImageSize: { x: > 0 and <= 32767, y: > 0 and <= 32767 } size })
-            imgSize = size;
-        else
-            imgSize = ImageSize;
-#else
-        imgSize = ImageSize;
-#endif
-
-        int superSampleX = imgSize.x * 2, superSampleY = imgSize.y * 2;
-
-        int maxTextureSize = DevkitServerUtility.MaxTextureDimensionSize;
-
-        if (imgSize.x > maxTextureSize || imgSize.y > maxTextureSize)
-        {
-            double aspect = (double)imgSize.x / imgSize.y;
-            double x, y;
-            if (imgSize.x <= imgSize.y)
-            {
-                x = aspect * maxTextureSize;
-                y = x / aspect;
-            }
-            else
-            {
-                y = maxTextureSize / aspect;
-                x = aspect * y;
-            }
-
-            imgSize.x = superSampleX = (int)Math.Round(x);
-            imgSize.y = superSampleY = (int)Math.Round(y);
-            wasSizeOutOfBounds = wasSuperSampleOutOfBounds = true;
-        }
-        else if (superSampleX > maxTextureSize || superSampleY > maxTextureSize)
-        {
-            double aspect = (double)superSampleX / superSampleY;
-            double x, y;
-            if (superSampleX <= superSampleY)
-            {
-                x = aspect * maxTextureSize;
-                y = x / aspect;
-            }
-            else
-            {
-                y = maxTextureSize / aspect;
-                x = aspect * y;
-            }
-
-            superSampleX = (int)Math.Round(x);
-            superSampleY = (int)Math.Round(y);
-            wasSuperSampleOutOfBounds = true;
-            wasSizeOutOfBounds = false;
+                wasSizeOutOfBounds = false;
         }
         else
         {
-            wasSuperSampleOutOfBounds = false;
-            wasSizeOutOfBounds = false;
+            if (imgSize.x > maxTextureSize || imgSize.y > maxTextureSize)
+            {
+                DevkitServerUtility.ScaleVector2ToFit(imgSize, maxTextureSize, out double x, out double y);
+                imgSize.x = (float)x;
+                imgSize.y = (float)y;
+                wasSizeOutOfBounds = true;
+            }
+            else
+                wasSizeOutOfBounds = false;
         }
 
-        superSampleSize = new Vector2Int(superSampleX, superSampleY);
         return imgSize;
     }
 
@@ -257,6 +199,7 @@ public static class CartographyTool
         public Matrix4x4 IntlTransformMatrix;
         public Matrix4x4 IntlTransformMatrixInverse;
         public Vector2Int IntlMapImageSize;
+        public Vector2 IntlMapImageSizeUnrounded;
         public Vector2 IntlCaptureSize;
         public Vector2 IntlDistanceScale; // mult = map to world, div = world to map
         public Bounds IntlCaptureBounds;
@@ -278,6 +221,7 @@ public static class CartographyTool
                 IntlCaptureBounds = vol.CalculateWorldBounds();
                 Vector3 size = vol.CalculateLocalBounds().size;
                 IntlMapImageSize = new Vector2Int(Mathf.CeilToInt(size.x), Mathf.CeilToInt(size.z));
+                IntlMapImageSizeUnrounded = new Vector2(size.x, size.z);
                 size = IntlCaptureBounds.size;
                 IntlCaptureSize = new Vector2(size.x, size.z);
                 IntlDistanceScale = new Vector2(IntlCaptureSize.x / IntlMapImageSize.x, IntlCaptureSize.y / IntlMapImageSize.y);
@@ -290,6 +234,7 @@ public static class CartographyTool
                 ushort s = Level.size;
                 float w = s - Level.border * 2f;
                 IntlMapImageSize = new Vector2Int(s, s);
+                IntlMapImageSizeUnrounded = new Vector2(s, s);
                 IntlCaptureSize = new Vector2(w, w);
                 IntlDistanceScale = new Vector2(w / s, w / s);
                 float minHeight = WaterVolumeManager.worldSeaLevel;
