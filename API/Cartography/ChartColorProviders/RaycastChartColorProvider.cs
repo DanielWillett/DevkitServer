@@ -159,8 +159,6 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
     /// </summary>
     protected internal static int GetRoadLayer(Transform transform, LevelCartographyConfigData? config, out EObjectChart chartType)
     {
-        RoadMaterial? material = null;
-
         Transform? parent = transform.parent;
         byte materialIndex = byte.MaxValue;
         RoadAsset? roadAsset = null;
@@ -174,7 +172,6 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
                 continue;
 
             roadAsset = road.GetRoadAsset();
-            material = LevelRoads.materials[road.material];
             materialIndex = road.material;
             break;
         }
@@ -189,6 +186,7 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
             return LayerMasks.ENVIRONMENT;
         }
 
+        RoadMaterial? material = LevelRoads.GetLegacyRoadConfig(materialIndex);
         if (material == null)
         {
             chartType = EObjectChart.NONE;

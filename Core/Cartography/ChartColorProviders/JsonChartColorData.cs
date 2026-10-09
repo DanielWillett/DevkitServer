@@ -173,7 +173,7 @@ public class JsonChartColorData : SchemaConfiguration
 
             float h = keyFrame.Height;
             if (keyFrame.HeightUnit == ColorGraphKeyframeHeightUnit.Absolute)
-                h = Mathf.Lerp(minimumHeight, maximumHeight, keyFrame.Height);
+                h = Mathf.InverseLerp(minimumHeight, maximumHeight, keyFrame.Height);
 
             if (h <= heightAlpha)
                 continue;
@@ -197,9 +197,9 @@ public class JsonChartColorData : SchemaConfiguration
         {
             isRelative = true;
             if (lowerKeyFrame.HeightUnit == ColorGraphKeyframeHeightUnit.Absolute)
-                h1 = Mathf.Lerp(minimumHeight, maximumHeight, lowerKeyFrame.Height);
+                h1 = Mathf.InverseLerp(minimumHeight, maximumHeight, lowerKeyFrame.Height);
             else if (higherKeyFrame.HeightUnit == ColorGraphKeyframeHeightUnit.Absolute)
-                h2 = Mathf.Lerp(minimumHeight, maximumHeight, higherKeyFrame.Height);
+                h2 = Mathf.InverseLerp(minimumHeight, maximumHeight, higherKeyFrame.Height);
         }
 
         float t = Mathf.InverseLerp(h1, h2, !isRelative && lowerKeyFrame.HeightUnit == ColorGraphKeyframeHeightUnit.Absolute ? worldHeight : heightAlpha);
