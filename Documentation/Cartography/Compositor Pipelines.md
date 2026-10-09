@@ -59,7 +59,7 @@ The `type` property is how the UI knows whether or not to recognize a JSON file 
   "auto_open": true,
 
   // noon (this doesn't really do anything for chart rendering)
-  "time": "12:00 PM"
+  "time": "12:00 PM",
 
   // apply a green background color (this also doesn't do anything for chart rendering)
   "background_color": "99ffcc",
